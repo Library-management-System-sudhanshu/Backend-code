@@ -16,18 +16,22 @@ export class AuthService {
       throw new BadRequestException('Email already registered');
     }
 
-    const existingWorkspace = await Workspace.findOne({ where: { subdomain: data.subdomain } });
-    if (existingWorkspace) {
-      throw new BadRequestException('Subdomain already in use');
-    }
-
     // Hash password
     const hashedPassword = await bcrypt.hash(data.password, 10);
+
+    // Automatically generate a unique subdomain from the workspace name
+    const baseSubdomain = data.workspaceName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'workspace';
+    let subdomain = baseSubdomain;
+    let counter = 1;
+    while (await Workspace.findOne({ where: { subdomain } })) {
+      subdomain = `${baseSubdomain}-${counter}`;
+      counter++;
+    }
 
     // Create Workspace
     const workspace = await Workspace.create({
       name: data.workspaceName,
-      subdomain: data.subdomain,
+      subdomain,
       address: data.address,
       logo: data.logo || null,
       gstNumber: data.gstNumber || null,
@@ -52,7 +56,7 @@ export class AuthService {
       password: hashedPassword,
       name: data.name,
       mobile: data.mobile || null,
-      role: 'WORKSPACE_OWNER',
+      role: 'OWNER',
       workspaceId: workspace.id,
       branchId: branch.id,
     } as any);

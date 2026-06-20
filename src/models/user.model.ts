@@ -5,7 +5,7 @@ import { StudentProfile } from './student-profile.model';
 
 export enum UserRole {
   SUPER_ADMIN = 'SUPER_ADMIN',
-  WORKSPACE_OWNER = 'WORKSPACE_OWNER',
+  OWNER = 'OWNER',
   MANAGER = 'MANAGER',
   STAFF = 'STAFF',
   STUDENT = 'STUDENT',
@@ -33,7 +33,7 @@ export class User extends Model<User> {
   mobile: string;
 
   @Column({
-    type: DataType.ENUM('SUPER_ADMIN', 'WORKSPACE_OWNER', 'MANAGER', 'STAFF', 'STUDENT'),
+    type: DataType.ENUM('SUPER_ADMIN', 'OWNER', 'MANAGER', 'STAFF', 'STUDENT'),
     allowNull: false,
     defaultValue: 'STUDENT',
   })
