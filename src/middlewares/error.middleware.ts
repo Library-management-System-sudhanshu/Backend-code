@@ -39,16 +39,26 @@ export const errorHandler = (
   res: Response,
   next: NextFunction
 ): void => {
-  const status = err.status || 500;
-  const message = err.message || 'Internal Server Error';
-  
-  if (status === 500) {
-    console.error(`[Error Handler]`, err);
+  let status = err.status || 500;
+  let message = err.message || 'Internal Server Error';
+  let errorName = err.name || 'HttpException';
+
+  // Map Sequelize Validation and Constraint errors to 400 Bad Request
+  if (err.name === 'SequelizeValidationError' || err.name === 'SequelizeUniqueConstraintError') {
+    status = 400;
+    message = err.errors ? err.errors.map((e: any) => e.message).join(', ') : err.message;
+    errorName = 'ValidationError';
+  }
+
+  // Log the error details for debugging
+  console.error(`[API Error] ${req.method} ${req.path} - Status: ${status} - Message: ${message}`);
+  if (status === 500 || err.name === 'SequelizeDatabaseError') {
+    console.error(err);
   }
 
   res.status(status).json({
     statusCode: status,
     message: message,
-    error: err.name || 'HttpException',
+    error: errorName,
   });
 };
