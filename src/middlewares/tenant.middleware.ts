@@ -10,7 +10,12 @@ export const tenantIsolation = (
 
   if (user && user.role !== 'SUPER_ADMIN') {
     if (req.method === 'GET') {
-      req.query.workspaceId = user.workspaceId;
+      const query = { ...req.query, workspaceId: user.workspaceId };
+      Object.defineProperty(req, 'query', {
+        value: query,
+        writable: true,
+        configurable: true,
+      });
     } else if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
       if (!req.body) {
         req.body = { workspaceId: user.workspaceId };
