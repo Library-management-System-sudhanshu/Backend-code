@@ -1,0 +1,1541 @@
+{
+  "info": {
+    "_postman_id": "studyflow-backend-api-collection",
+    "name": "StudyFlow Express API",
+    "description": "Complete Postman collection for the StudyFlow Express.js Node.js MVC backend. Features Workspace management, Shift allocations, Student profiles, Library, Payments, and Attendance.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register (Workspace Owner)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"owner@example.com\",\n  \"password\": \"Owner@123\",\n  \"name\": \"Rakesh Kumar\",\n  \"mobile\": \"9876543210\",\n  \"workspaceName\": \"Smart Study Hall\",\n  \"subdomain\": \"smartstudy\",\n  \"address\": \"123 Sector 15, Rohini, Delhi\",\n  \"logo\": \"\",\n  \"gstNumber\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"owner@example.com\",\n  \"password\": \"Owner@123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "OTP Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mobile\": \"9876543210\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/otp-request",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "otp-request"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "OTP Verify",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mobile\": \"9876543210\",\n  \"otp\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/otp-verify",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "otp-verify"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Workspaces",
+      "item": [
+        {
+          "name": "Get All Workspaces (Super Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/workspaces",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "workspaces"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Workspace By ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/workspaces/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "workspaces",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "a60fbf49-46fc-48d0-84c2-a99d8001a907"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Workspace",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Smart Study Hall Premium\",\n  \"address\": \"456 Rohini Sector 9, Delhi\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/workspaces/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "workspaces",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "a60fbf49-46fc-48d0-84c2-a99d8001a907"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Branches",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/workspaces/:workspaceId/branches",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "workspaces",
+                ":workspaceId",
+                "branches"
+              ],
+              "variable": [
+                {
+                  "key": "workspaceId",
+                  "value": "a60fbf49-46fc-48d0-84c2-a99d8001a907"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Branch",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Premium Block A\",\n  \"address\": \"First Floor, Block A\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/workspaces/:workspaceId/branches",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "workspaces",
+                ":workspaceId",
+                "branches"
+              ],
+              "variable": [
+                {
+                  "key": "workspaceId",
+                  "value": "a60fbf49-46fc-48d0-84c2-a99d8001a907"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Branch",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Premium Block A+ (Updated)\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/workspaces/branches/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "workspaces",
+                "branches",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Shifts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/workspaces/:workspaceId/shifts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "workspaces",
+                ":workspaceId",
+                "shifts"
+              ],
+              "variable": [
+                {
+                  "key": "workspaceId",
+                  "value": "a60fbf49-46fc-48d0-84c2-a99d8001a907"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Shift",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Morning shift\",\n  \"startTime\": \"00:00\",\n  \"endTime\": \"06:00\",\n  \"capacity\": 0,\n  \"price\": 600\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/workspaces/:workspaceId/shifts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "workspaces",
+                ":workspaceId",
+                "shifts"
+              ],
+              "variable": [
+                {
+                  "key": "workspaceId",
+                  "value": "a60fbf49-46fc-48d0-84c2-a99d8001a907"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Shift",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"price\": 650\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/workspaces/shifts/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "workspaces",
+                "shifts",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Shift",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/workspaces/shifts/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "workspaces",
+                "shifts",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Subscription Plans",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/workspaces/:workspaceId/plans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "workspaces",
+                ":workspaceId",
+                "plans"
+              ],
+              "variable": [
+                {
+                  "key": "workspaceId",
+                  "value": "a60fbf49-46fc-48d0-84c2-a99d8001a907"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Subscription Plan",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"30-Day Unlimited Access\",\n  \"durationDays\": 30,\n  \"price\": 1200,\n  \"description\": \"Complete study space access for one month\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/workspaces/:workspaceId/plans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "workspaces",
+                ":workspaceId",
+                "plans"
+              ],
+              "variable": [
+                {
+                  "key": "workspaceId",
+                  "value": "a60fbf49-46fc-48d0-84c2-a99d8001a907"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Workspace Settings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/workspaces/:workspaceId/settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "workspaces",
+                ":workspaceId",
+                "settings"
+              ],
+              "variable": [
+                {
+                  "key": "workspaceId",
+                  "value": "a60fbf49-46fc-48d0-84c2-a99d8001a907"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Workspace Settings",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"themeColor\": \"#10B981\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/workspaces/:workspaceId/settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "workspaces",
+                ":workspaceId",
+                "settings"
+              ],
+              "variable": [
+                {
+                  "key": "workspaceId",
+                  "value": "a60fbf49-46fc-48d0-84c2-a99d8001a907"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Students",
+      "item": [
+        {
+          "name": "Self Register (Public)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"student1@example.com\",\n  \"password\": \"Student@123\",\n  \"name\": \"Ankit Sharma\",\n  \"mobile\": \"9999988888\",\n  \"workspaceId\": \"a60fbf49-46fc-48d0-84c2-a99d8001a907\",\n  \"branchId\": \"\",\n  \"guardianName\": \"M. P. Sharma\",\n  \"guardianMobile\": \"8888877777\",\n  \"aadharNumber\": \"123456789012\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/students/self-register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "students",
+                "self-register"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Students",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/students?limit=10&page=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "students"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Student Profile By ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/students/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "students",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Student (Staff/Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"student2@example.com\",\n  \"password\": \"Student@123\",\n  \"name\": \"Vijay Singh\",\n  \"mobile\": \"9898989898\",\n  \"branchId\": \"\",\n  \"guardianName\": \"S. P. Singh\",\n  \"guardianMobile\": \"9090909090\",\n  \"aadharNumber\": \"987654321098\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/students",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "students"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Student",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ankit Sharma (Updated)\",\n  \"guardianName\": \"Mohan Prasad Sharma\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/students/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "students",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Student Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"APPROVED\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/students/:id/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "students",
+                ":id",
+                "status"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Student",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/students/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "students",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Seats",
+      "item": [
+        {
+          "name": "Get Seat Map",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/seats/map/:branchId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "seats",
+                "map",
+                ":branchId"
+              ],
+              "variable": [
+                {
+                  "key": "branchId",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Add Floor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"branchId\": \"\",\n  \"name\": \"1st Floor\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/seats/floors",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "seats",
+                "floors"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Add Room",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"floorId\": \"\",\n  \"name\": \"Premium Hall\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/seats/rooms",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "seats",
+                "rooms"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Add Seat",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roomId\": \"\",\n  \"number\": \"A-10\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/seats/seats",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "seats",
+                "seats"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Allocate Seat",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"studentProfileId\": \"\",\n  \"seatId\": \"\",\n  \"shiftId\": \"\",\n  \"startDate\": \"2026-06-20\",\n  \"endDate\": \"2026-07-20\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/seats/allocate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "seats",
+                "allocate"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Transfer Seat",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"allocationId\": \"\",\n  \"targetSeatId\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/seats/transfer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "seats",
+                "transfer"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "item": [
+        {
+          "name": "Create Payment Request (Razorpay/Cash)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"studentProfileId\": \"\",\n  \"amount\": 1200,\n  \"method\": \"CASH\",\n  \"subscriptionPlanId\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/payments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Record Manual Payment (Cash/UPI)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"method\": \"UPI\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/payments/:id/manual",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                ":id",
+                "manual"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Payments List",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/payments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments"
+              ],
+              "query": [
+                {
+                  "key": "studentProfileId",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Collection Report",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/payments/report?range=monthly",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "report"
+              ],
+              "query": [
+                {
+                  "key": "range",
+                  "value": "monthly"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Attendance",
+      "item": [
+        {
+          "name": "Check-in (QR or Manual)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"studentProfileId\": \"\",\n  \"method\": \"QR_CODE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/attendance/check-in",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "attendance",
+                "check-in"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Check-out",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"studentProfileId\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/attendance/check-out",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "attendance",
+                "check-out"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Daily Attendance List",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/attendance/daily?date=2026-06-20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "attendance",
+                "daily"
+              ],
+              "query": [
+                {
+                  "key": "date",
+                  "value": "2026-06-20"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Library",
+      "item": [
+        {
+          "name": "List Books",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/library/books",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "library",
+                "books"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Add Book",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Concepts of Physics\",\n  \"author\": \"H. C. Verma\",\n  \"isbn\": \"978-8177091878\",\n  \"quantity\": 5\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/library/books",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "library",
+                "books"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Issue Book",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookId\": \"\",\n  \"studentProfileId\": \"\",\n  \"issuedById\": \"\",\n  \"durationDays\": 14\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/library/books/issue",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "library",
+                "books",
+                "issue"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Return Book",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/library/books/return/:issueId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "library",
+                "books",
+                "return",
+                ":issueId"
+              ],
+              "variable": [
+                {
+                  "key": "issueId",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Complaints",
+      "item": [
+        {
+          "name": "Submit Complaint (Student)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"studentProfileId\": \"\",\n  \"category\": \"FACILITIES\",\n  \"description\": \"AC in Block B is not cooling properly.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/complaints",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "complaints"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Complaints (Staff)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/complaints",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "complaints"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "WhatsApp Logs & Templates",
+      "item": [
+        {
+          "name": "Get Msg Templates",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/whatsapp/templates",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "whatsapp",
+                "templates"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Broadcast Custom Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"templateId\": \"renewal_reminder\",\n  \"customVariables\": {\n    \"endDate\": \"2026-06-30\",\n    \"seatNumber\": \"A-10\"\n  },\n  \"filters\": {\n    \"branchId\": \"\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/whatsapp/broadcast",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "whatsapp",
+                "broadcast"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Dashboard Metrics",
+      "item": [
+        {
+          "name": "Get Dashboard Metrics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/metrics",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dashboard",
+                "metrics"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "ENTER_JWT_TOKEN_HERE",
+      "type": "string"
+    }
+  ]
+}
