@@ -10,26 +10,26 @@ router.use(authenticateJWT);
 
 router.post(
   '/check-in',
-  requireRoles('WORKSPACE_OWNER', 'MANAGER', 'STAFF', 'STUDENT'),
+  requireRoles('OWNER', 'MANAGER', 'STAFF', 'STUDENT'),
   (req, res, next) => controller.checkIn(req, res, next)
 );
 
 router.post(
   '/check-out',
-  requireRoles('WORKSPACE_OWNER', 'MANAGER', 'STAFF', 'STUDENT'),
+  requireRoles('OWNER', 'MANAGER', 'STAFF', 'STUDENT'),
   (req, res, next) => controller.checkOut(req, res, next)
 );
 
 router.get(
   '/daily',
-  requireRoles('WORKSPACE_OWNER', 'MANAGER', 'STAFF'),
+  requireRoles('OWNER', 'MANAGER', 'STAFF'),
   tenantIsolation,
   (req, res, next) => controller.getDailyAttendance(req, res, next)
 );
 
 router.get(
   '/student/:studentProfileId',
-  requireRoles('WORKSPACE_OWNER', 'MANAGER', 'STAFF', 'STUDENT'),
+  requireRoles('OWNER', 'MANAGER', 'STAFF', 'STUDENT'),
   (req, res, next) => controller.getStudentAttendanceHistory(req, res, next)
 );
 

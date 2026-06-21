@@ -10,7 +10,7 @@ router.use(authenticateJWT);
 
 router.get(
   '/metrics',
-  requireRoles('WORKSPACE_OWNER', 'MANAGER', 'STAFF'),
+  requireRoles('OWNER', 'MANAGER', 'STAFF'),
   tenantIsolation,
   (req, res, next) => controller.getMetrics(req, res, next)
 );

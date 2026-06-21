@@ -16,14 +16,14 @@ router.post(
 
 router.get(
   '/',
-  requireRoles('WORKSPACE_OWNER', 'MANAGER', 'STAFF'),
+  requireRoles('OWNER', 'MANAGER', 'STAFF'),
   tenantIsolation,
   (req, res, next) => controller.getWorkspaceComplaints(req, res, next)
 );
 
 router.patch(
   '/:id',
-  requireRoles('WORKSPACE_OWNER', 'MANAGER', 'STAFF'),
+  requireRoles('OWNER', 'MANAGER', 'STAFF'),
   (req, res, next) => controller.updateComplaintStatus(req, res, next)
 );
 
