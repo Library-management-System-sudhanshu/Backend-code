@@ -98,6 +98,13 @@ export class SeatService {
     return { success: true };
   }
 
+  async updateFloor(floorId: string, name: string) {
+    const floor = await Floor.findByPk(floorId);
+    if (!floor) throw new NotFoundException('Floor not found');
+    await floor.update({ name });
+    return floor;
+  }
+
   async allocateSeat(data: any) {
     const { studentProfileId, seatId, shiftId, startDate, endDate } = data;
 
@@ -167,6 +174,19 @@ export class SeatService {
     await targetSeat.update({ status: SeatStatus.OCCUPIED });
 
     return newAllocation;
+  }
+
+  async vacateSeat(seatId: string) {
+    const seat = await Seat.findByPk(seatId);
+    if (!seat) throw new NotFoundException('Seat not found');
+
+    await SeatAllocation.update(
+      { isActive: false },
+      { where: { seatId, isActive: true } }
+    );
+
+    await seat.update({ status: SeatStatus.AVAILABLE });
+    return { success: true };
   }
 
   async checkExpirations() {

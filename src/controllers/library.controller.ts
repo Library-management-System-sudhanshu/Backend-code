@@ -16,7 +16,7 @@ export class LibraryController {
 
   async createBook(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const workspaceId = req.query.workspaceId as string;
+      const workspaceId = (req.body.workspaceId || req.query.workspaceId) as string;
       const result = await libraryService.createBook(workspaceId, req.body);
       res.status(201).json(result);
     } catch (error) {
@@ -44,7 +44,7 @@ export class LibraryController {
 
   async issueBook(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const workspaceId = req.query.workspaceId as string;
+      const workspaceId = (req.body.workspaceId || req.query.workspaceId) as string;
       const result = await libraryService.issueBook(workspaceId, req.body);
       res.status(201).json(result);
     } catch (error) {

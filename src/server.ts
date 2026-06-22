@@ -3,6 +3,7 @@ dotenv.config();
 
 import app from './app';
 import sequelize from './config/database';
+import { CronService } from './services/cron.service';
 
 const PORT = process.env.PORT || 3000;
 
@@ -16,6 +17,9 @@ async function startServer() {
     // synchronize: true in NestJS creates/updates tables automatically
     await sequelize.sync({ alter: true });
     console.log('[Database] Models synchronized successfully.');
+
+    // Initialize Cron Jobs
+    CronService.init();
 
     // Start Express server
     app.listen(PORT, () => {

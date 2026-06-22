@@ -4,6 +4,8 @@ import { User } from '../models/user.model';
 import { StudentProfile } from '../models/student-profile.model';
 import { Branch } from '../models/branch.model';
 import { SeatAllocation } from '../models/seat-allocation.model';
+import { Seat } from '../models/seat.model';
+import { Shift } from '../models/shift.model';
 import { StudentSubscription } from '../models/student-subscription.model';
 import { Payment } from '../models/payment.model';
 import { NotFoundException, BadRequestException } from '../middlewares/error.middleware';
@@ -34,6 +36,10 @@ export class StudentService {
           model: SeatAllocation,
           required: false,
           where: { isActive: true },
+          include: [
+            { model: Seat },
+            { model: Shift },
+          ]
         },
       ],
       limit: Number(limit),
@@ -132,6 +138,7 @@ export class StudentService {
       aadharNumber: data.aadharNumber ?? profile.aadharNumber,
       branchId: data.branchId ?? profile.branchId,
       status: data.status ?? profile.status,
+      joiningDate: data.joiningDate ?? profile.joiningDate,
     });
 
     return { user, profile };

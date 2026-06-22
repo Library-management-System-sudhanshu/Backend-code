@@ -43,6 +43,12 @@ router.delete(
   (req, res, next) => controller.deleteFloor(req, res, next)
 );
 
+router.patch(
+  '/floors/:id',
+  requireRoles('OWNER', 'MANAGER'),
+  (req, res, next) => controller.updateFloor(req, res, next)
+);
+
 router.delete(
   '/:id',
   requireRoles('OWNER', 'MANAGER'),
@@ -65,6 +71,12 @@ router.post(
   '/transfer',
   requireRoles('OWNER', 'MANAGER', 'STAFF'),
   (req, res, next) => controller.transferSeat(req, res, next)
+);
+
+router.post(
+  '/:id/vacate',
+  requireRoles('OWNER', 'MANAGER', 'STAFF'),
+  (req, res, next) => controller.vacateSeat(req, res, next)
 );
 
 router.post(

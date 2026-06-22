@@ -29,6 +29,49 @@ export class WhatsAppService {
     ];
   }
 
+  async sendMessage(workspaceId: string, studentProfileId: string, data: any) {
+    const { templateId, customVariables } = data;
+
+    const student = await StudentProfile.findOne({
+      where: { id: studentProfileId, status: 'APPROVED' },
+      include: [
+        {
+          model: User,
+          where: { workspaceId },
+          required: true,
+        },
+      ],
+    });
+
+    if (!student || !student.user) {
+      return null;
+    }
+
+    const templates = await this.getTemplates();
+    const template = templates.find((t) => t.id === templateId);
+    const templateText = template ? template.text : 'Broadcast message';
+
+    const recipient = student.user.mobile || 'Unknown';
+    let message = templateText.replace('{{studentName}}', student.user.name);
+
+    if (customVariables) {
+      Object.keys(customVariables).forEach((key) => {
+        message = message.replace(`{{${key}}}`, customVariables[key]);
+      });
+    }
+
+    const isSent = await this.dispatchToWaha(recipient, message);
+
+    const log = await WhatsAppLog.create({
+      workspaceId,
+      recipient,
+      message,
+      status: isSent ? 'SENT' : 'FAILED',
+    } as any);
+
+    return log;
+  }
+
   async sendBroadcast(workspaceId: string, data: any) {
     const { templateId, customVariables, filters } = data;
     const { branchId, shiftId } = filters || {};
@@ -72,21 +115,20 @@ export class WhatsAppService {
         });
       }
 
-      // Simulating API Dispatch
-      console.log(`[WhatsApp Broadcast] Sending message to ${recipient}: "${message}"`);
+      const isSent = await this.dispatchToWaha(recipient, message);
 
       const log = await WhatsAppLog.create({
         workspaceId,
         recipient,
         message,
-        status: 'SENT',
+        status: isSent ? 'SENT' : 'FAILED',
       } as any);
 
       logs.push(log);
     }
 
     return {
-      sentCount: logs.length,
+      sentCount: logs.filter((l) => l.status === 'SENT').length,
       logs,
     };
   }
@@ -96,5 +138,64 @@ export class WhatsAppService {
       where: { workspaceId },
       order: [['sentAt', 'DESC']],
     });
+  }
+
+  private async dispatchToWaha(recipient: string, message: string): Promise<boolean> {
+    const wahaUrl = process.env.WAHA_URL;
+    const apiKey = process.env.WAHA_API_KEY;
+    const session = process.env.WAHA_SESSION || 'default';
+
+    if (!wahaUrl) {
+      console.log(`[WhatsApp Simulator (Fallback)] Sending message to ${recipient}: "${message}"`);
+      return true;
+    }
+
+    // Sanitize recipient number to digits only
+    const sanitizedRecipient = recipient.replace(/\D/g, '');
+    if (!sanitizedRecipient) {
+      console.error('[WhatsApp Service Error] Recipient number contains no digits:', recipient);
+      return false;
+    }
+
+    // WAHA expects the chatId format to be {phone_number}@c.us
+    const chatId = `${sanitizedRecipient}@c.us`;
+
+    try {
+      const url = `${wahaUrl}/api/sendText`;
+      const headers: any = {
+        'Content-Type': 'application/json',
+      };
+
+      if (apiKey) {
+        headers['X-Api-Key'] = apiKey;
+      }
+
+      console.log(`[WhatsApp API Call] Sending to ${chatId} via WAHA at ${url}...`);
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          session,
+          chatId,
+          text: message,
+        }),
+      });
+
+      const responseData = (await response.json()) as any;
+
+      if (!response.ok) {
+        console.error('[WhatsApp Service Error] WAHA API Error Response:', responseData);
+        return false;
+      }
+
+      console.log(
+        `[WhatsApp Service Success] Message sent successfully to ${chatId}. Message ID: ${responseData?.id}`
+      );
+      return true;
+    } catch (error) {
+      console.error('[WhatsApp Service Error] Failed to call WAHA API:', error);
+      return false;
+    }
   }
 }

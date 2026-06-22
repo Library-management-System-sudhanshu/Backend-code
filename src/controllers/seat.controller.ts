@@ -58,6 +58,15 @@ export class SeatController {
     }
   }
 
+  async updateFloor(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await seatService.updateFloor((req.params.id as string), req.body.name);
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async deleteSeat(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const result = await seatService.deleteSeat((req.params.id as string));
@@ -88,6 +97,15 @@ export class SeatController {
   async transferSeat(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const result = await seatService.transferSeat(req.body.allocationId, req.body.targetSeatId);
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async vacateSeat(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await seatService.vacateSeat((req.params.id as string));
       res.status(200).json(result);
     } catch (error) {
       next(error);
