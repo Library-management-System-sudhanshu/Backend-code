@@ -126,11 +126,29 @@ export class StudentService {
     if (!profile) throw new NotFoundException('Student profile not found');
 
     const user = profile.user;
-    await user.update({
+
+    if (data.email && data.email !== user.email) {
+      const existingUser = await User.findOne({ where: { email: data.email } });
+      if (existingUser) {
+        throw new BadRequestException('Email already in use');
+      }
+    }
+
+    const userUpdates: any = {
       name: data.name ?? user.name,
       mobile: data.mobile ?? user.mobile,
       avatar: data.avatar ?? user.avatar,
-    });
+    };
+
+    if (data.email) {
+      userUpdates.email = data.email;
+    }
+
+    if (data.password) {
+      userUpdates.password = await bcrypt.hash(data.password, 10);
+    }
+
+    await user.update(userUpdates);
 
     await profile.update({
       guardianName: data.guardianName ?? profile.guardianName,

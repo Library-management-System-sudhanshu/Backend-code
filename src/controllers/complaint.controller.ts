@@ -35,4 +35,13 @@ export class ComplaintController {
       next(error);
     }
   }
+
+  async getStudentComplaints(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await complaintService.getStudentComplaints((req.params.studentProfileId as string));
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
 }

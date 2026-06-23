@@ -54,4 +54,10 @@ router.get(
   (req, res, next) => controller.getIssuedBooks(req, res, next)
 );
 
+router.get(
+  '/books/student/:studentProfileId',
+  requireRoles('STUDENT', 'OWNER', 'MANAGER', 'STAFF'),
+  (req, res, next) => controller.getStudentIssuedBooks(req, res, next)
+);
+
 export default router;

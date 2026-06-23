@@ -29,6 +29,13 @@ export class ComplaintService {
     });
   }
 
+  async getStudentComplaints(studentProfileId: string) {
+    return Complaint.findAll({
+      where: { studentProfileId },
+      order: [['createdAt', 'DESC']],
+    });
+  }
+
   async updateComplaintStatus(id: string, resolvedById: string, status: ComplaintStatus) {
     const complaint = await Complaint.findByPk(id);
     if (!complaint) throw new NotFoundException('Complaint not found');

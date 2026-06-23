@@ -27,4 +27,10 @@ router.patch(
   (req, res, next) => controller.updateComplaintStatus(req, res, next)
 );
 
+router.get(
+  '/student/:studentProfileId',
+  requireRoles('STUDENT', 'OWNER', 'MANAGER', 'STAFF'),
+  (req, res, next) => controller.getStudentComplaints(req, res, next)
+);
+
 export default router;

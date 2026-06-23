@@ -89,4 +89,14 @@ export class LibraryService {
       ],
     });
   }
+
+  async getStudentIssuedBooks(studentProfileId: string) {
+    return BookIssue.findAll({
+      where: { studentProfileId },
+      include: [
+        { model: Book },
+      ],
+      order: [['createdAt', 'DESC']],
+    });
+  }
 }
