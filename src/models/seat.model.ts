@@ -35,6 +35,12 @@ export class Seat extends Model<Seat> {
   })
   status: SeatStatus;
 
+  @Column({ type: DataType.FLOAT, allowNull: true })
+  x: number | null;
+
+  @Column({ type: DataType.FLOAT, allowNull: true })
+  y: number | null;
+
   @HasMany(() => SeatAllocation)
   allocations: SeatAllocation[];
 }

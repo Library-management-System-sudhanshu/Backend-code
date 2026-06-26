@@ -42,6 +42,9 @@ export class User extends Model<User> {
   @Column({ type: DataType.STRING, allowNull: true })
   avatar: string;
 
+  @Column({ type: DataType.TEXT, allowNull: true })
+  fcmToken: string;
+
   @ForeignKey(() => Workspace)
   @Column({ type: DataType.UUID, allowNull: true })
   workspaceId: string;

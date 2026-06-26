@@ -31,6 +31,12 @@ router.post(
   (req, res, next) => controller.addSeat(req, res, next)
 );
 
+router.put(
+  '/layout',
+  requireRoles('OWNER', 'MANAGER'),
+  (req, res, next) => controller.updateLayout(req, res, next)
+);
+
 router.delete(
   '/rooms/:id',
   requireRoles('OWNER', 'MANAGER'),

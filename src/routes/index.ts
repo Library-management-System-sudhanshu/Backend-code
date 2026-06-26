@@ -9,6 +9,7 @@ import libraryRoutes from './library.routes';
 import complaintRoutes from './complaint.routes';
 import whatsappRoutes from './whatsapp.routes';
 import dashboardRoutes from './dashboard.routes';
+import noticeRoutes from './notice.routes';
 
 const router = Router();
 
@@ -22,5 +23,6 @@ router.use('/library', libraryRoutes);
 router.use('/complaints', complaintRoutes);
 router.use('/whatsapp', whatsappRoutes);
 router.use('/dashboard', dashboardRoutes);
+router.use('/notices', noticeRoutes);
 
 export default router;

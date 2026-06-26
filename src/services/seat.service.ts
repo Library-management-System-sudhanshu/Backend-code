@@ -209,4 +209,18 @@ export class SeatService {
 
     return { expiredCount: expiredAllocations.length };
   }
+
+  async updateLayout(roomId: string, layout: Array<{ id: string; x: number; y: number }>) {
+    const updatedIds = [];
+    for (const item of layout) {
+      const [updatedCount] = await Seat.update(
+        { x: item.x, y: item.y },
+        { where: { id: item.id, roomId } }
+      );
+      if (updatedCount > 0) {
+        updatedIds.push(item.id);
+      }
+    }
+    return { success: true, updatedCount: updatedIds.length };
+  }
 }

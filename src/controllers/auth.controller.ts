@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthService } from '../services/auth.service';
+import { AuthenticatedRequest } from '../middlewares/auth.middleware';
 
 const authService = new AuthService();
 
@@ -39,4 +40,20 @@ export class AuthController {
       next(error);
     }
   }
+
+  async updateFcmToken(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const authReq = req as AuthenticatedRequest;
+      const userId = authReq.user?.id;
+      if (!userId) {
+        res.status(401).json({ message: 'Unauthorized' });
+        return;
+      }
+      await authService.updateFcmToken(userId, req.body.fcmToken);
+      res.status(200).json({ success: true, message: 'FCM Token updated successfully' });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
+

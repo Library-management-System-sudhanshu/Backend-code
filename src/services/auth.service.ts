@@ -116,4 +116,13 @@ export class AuthService {
       },
     };
   }
+
+  async updateFcmToken(userId: string, fcmToken: string) {
+    const user = await User.findByPk(userId);
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+    await user.update({ fcmToken });
+    return user;
+  }
 }

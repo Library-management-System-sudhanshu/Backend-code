@@ -120,4 +120,14 @@ export class SeatController {
       next(error);
     }
   }
+
+  async updateLayout(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { roomId, layout } = req.body;
+      const result = await seatService.updateLayout(roomId, layout);
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
 }

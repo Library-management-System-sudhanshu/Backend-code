@@ -22,4 +22,10 @@ export class WorkspaceSetting extends Model<WorkspaceSetting> {
 
   @Column({ type: DataType.STRING, defaultValue: '#2563EB' })
   themeColor: string;
+
+  @Column({ type: DataType.STRING, allowNull: true })
+  upiId: string;
+
+  @Column({ type: DataType.TEXT, allowNull: true })
+  qrCodeUrl: string;
 }

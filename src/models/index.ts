@@ -16,3 +16,4 @@ export * from './book.model';
 export * from './book-issue.model';
 export * from './complaint.model';
 export * from './whatsapp-log.model';
+export * from './notice.model';
