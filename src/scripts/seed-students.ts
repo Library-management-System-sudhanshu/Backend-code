@@ -239,7 +239,7 @@ async function seed() {
 
   // 9. Seed 65 Students to match occupied seats (1 to 65)
   console.log('Seeding 65 students...');
-  const hashedStudentPassword = await bcrypt.hash('password123', 10);
+  const hashedStudentPassword = await bcrypt.hash('Student@123', 10);
 
   for (let i = 1; i <= 65; i++) {
     const email = `student${i}@studyflow.com`;
@@ -249,6 +249,7 @@ async function seed() {
     const user = await User.create({
       email,
       password: hashedStudentPassword,
+      rawPassword: 'Student@123',
       name,
       mobile,
       role: 'STUDENT',

@@ -2,6 +2,7 @@ import { Floor } from '../models/floor.model';
 import { Room } from '../models/room.model';
 import { Seat, SeatStatus } from '../models/seat.model';
 import { SeatAllocation } from '../models/seat-allocation.model';
+import { StudentSubscription, SubscriptionStatus } from '../models/student-subscription.model';
 import { StudentProfile } from '../models/student-profile.model';
 import { Shift } from '../models/shift.model';
 import { Op } from 'sequelize';
@@ -262,6 +263,35 @@ export class SeatService {
     if (data.endDate) allocation.endDate = new Date(data.endDate);
     
     await allocation.save();
+
+    // Sync with StudentSubscription if it exists
+    const latestSub = await StudentSubscription.findOne({
+      where: {
+        studentProfileId: allocation.studentProfileId,
+      },
+      order: [['createdAt', 'DESC']],
+    });
+
+    if (latestSub) {
+      if (data.startDate) latestSub.startDate = new Date(data.startDate);
+      if (data.endDate) {
+        const newEndDate = new Date(data.endDate);
+        latestSub.endDate = newEndDate;
+        
+        // Update status based on the new end date
+        if (newEndDate > new Date()) {
+          if (latestSub.status === SubscriptionStatus.EXPIRED) {
+            latestSub.status = SubscriptionStatus.ACTIVE;
+          }
+        } else {
+          if (latestSub.status === SubscriptionStatus.ACTIVE) {
+            latestSub.status = SubscriptionStatus.EXPIRED;
+          }
+        }
+      }
+      await latestSub.save();
+    }
+
     return allocation;
   }
 }
