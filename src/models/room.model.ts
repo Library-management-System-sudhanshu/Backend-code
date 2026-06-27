@@ -21,6 +21,12 @@ export class Room extends Model<Room> {
   @Column({ type: DataType.STRING, allowNull: false })
   name: string;
 
+  @Column({ type: DataType.INTEGER, allowNull: true })
+  canvasWidth: number | null;
+
+  @Column({ type: DataType.INTEGER, allowNull: true })
+  canvasHeight: number | null;
+
   @HasMany(() => Seat)
   seats: Seat[];
 }

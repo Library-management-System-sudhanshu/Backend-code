@@ -67,6 +67,15 @@ export class SeatController {
     }
   }
 
+  async updateRoom(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await seatService.updateRoom((req.params.id as string), req.body.name);
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async deleteSeat(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const result = await seatService.deleteSeat((req.params.id as string));
@@ -123,8 +132,17 @@ export class SeatController {
 
   async updateLayout(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { roomId, layout } = req.body;
-      const result = await seatService.updateLayout(roomId, layout);
+      const { roomId, layout, canvasWidth, canvasHeight } = req.body;
+      const result = await seatService.updateLayout(roomId, layout, canvasWidth, canvasHeight);
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateAllocation(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await seatService.updateAllocation((req.params.id as string), req.body);
       res.status(200).json(result);
     } catch (error) {
       next(error);

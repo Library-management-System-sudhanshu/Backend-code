@@ -65,7 +65,10 @@ export class AuthService {
   }
 
   async login(data: any) {
-    const user = await User.findOne({ where: { email: data.email } });
+    const user = await User.findOne({ 
+      where: { email: data.email },
+      include: [Workspace]
+    });
     if (!user) {
       throw new UnauthorizedException('Invalid email or password');
     }
@@ -113,6 +116,14 @@ export class AuthService {
         role: user.role,
         workspaceId: user.workspaceId,
         branchId: user.branchId,
+        workspace: user.workspace ? {
+          id: user.workspace.id,
+          name: user.workspace.name,
+          address: user.workspace.address,
+          pincode: user.workspace.pincode,
+          gstNumber: user.workspace.gstNumber,
+          subdomain: user.workspace.subdomain
+        } : null
       },
     };
   }
@@ -124,5 +135,77 @@ export class AuthService {
     }
     await user.update({ fcmToken });
     return user;
+  }
+
+  async getProfile(userId: string) {
+    const user = await User.findByPk(userId, {
+      attributes: { exclude: ['password'] },
+      include: [Workspace]
+    });
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+    return user;
+  }
+
+  async updateProfile(userId: string, data: any) {
+    const user = await User.findByPk(userId, { include: [Workspace] });
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
+    const updateData: any = {};
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.email !== undefined) {
+      if (data.email !== user.email) {
+        const existing = await User.findOne({ where: { email: data.email } });
+        if (existing) {
+          throw new BadRequestException('Email already registered');
+        }
+      }
+      updateData.email = data.email;
+    }
+    if (data.mobile !== undefined) updateData.mobile = data.mobile;
+    if (data.avatar !== undefined) updateData.avatar = data.avatar;
+
+    if (data.password) {
+      updateData.password = await bcrypt.hash(data.password, 10);
+    }
+
+    await user.update(updateData);
+
+    // Update Workspace details if provided
+    if (user.workspace) {
+      const wsUpdate: any = {};
+      if (data.workspaceName !== undefined) wsUpdate.name = data.workspaceName;
+      if (data.address !== undefined) wsUpdate.address = data.address;
+      if (data.gstNumber !== undefined) wsUpdate.gstNumber = data.gstNumber;
+      if (data.pincode !== undefined) wsUpdate.pincode = data.pincode;
+
+      if (Object.keys(wsUpdate).length > 0) {
+        await user.workspace.update(wsUpdate);
+      }
+    }
+    
+    // Fetch fresh user record with workspace info
+    const freshUser = await User.findByPk(userId, { include: [Workspace] });
+    return {
+      id: freshUser!.id,
+      email: freshUser!.email,
+      name: freshUser!.name,
+      role: freshUser!.role,
+      workspaceId: freshUser!.workspaceId,
+      branchId: freshUser!.branchId,
+      mobile: freshUser!.mobile,
+      avatar: freshUser!.avatar,
+      workspace: freshUser!.workspace ? {
+        id: freshUser!.workspace.id,
+        name: freshUser!.workspace.name,
+        address: freshUser!.workspace.address,
+        gstNumber: freshUser!.workspace.gstNumber,
+        pincode: freshUser!.workspace.pincode,
+        subdomain: freshUser!.workspace.subdomain
+      } : null
+    };
   }
 }

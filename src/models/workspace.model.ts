@@ -29,6 +29,9 @@ export class Workspace extends Model<Workspace> {
   @Column({ type: DataType.STRING, allowNull: false })
   address: string;
 
+  @Column({ type: DataType.STRING, allowNull: true })
+  pincode: string;
+
   @Column({ type: DataType.BOOLEAN, defaultValue: true })
   isActive: boolean;
 

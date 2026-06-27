@@ -55,6 +55,12 @@ router.patch(
   (req, res, next) => controller.updateFloor(req, res, next)
 );
 
+router.patch(
+  '/rooms/:id',
+  requireRoles('OWNER', 'MANAGER'),
+  (req, res, next) => controller.updateRoom(req, res, next)
+);
+
 router.delete(
   '/:id',
   requireRoles('OWNER', 'MANAGER'),
@@ -89,6 +95,12 @@ router.post(
   '/check-expirations',
   requireRoles('OWNER', 'MANAGER', 'STAFF'),
   (req, res, next) => controller.checkExpirations(req, res, next)
+);
+
+router.patch(
+  '/allocations/:id',
+  requireRoles('OWNER', 'MANAGER', 'STAFF'),
+  (req, res, next) => controller.updateAllocation(req, res, next)
 );
 
 export default router;

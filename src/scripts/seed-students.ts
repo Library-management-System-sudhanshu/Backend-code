@@ -19,20 +19,36 @@ import {
   BookIssue,
   Payment,
   WorkspaceSetting,
+  UserRole,
 } from '../models';
+
+const INDIAN_NAMES = [
+  'Aarav Sharma', 'Aditya Patel', 'Arjun Verma', 'Vihaan Gupta', 'Sai Reddy',
+  'Ananya Iyer', 'Diya Sen', 'Isha Rao', 'Krishna Nair', 'Pranav Joshi',
+  'Kabir Malhotra', 'Rohan Das', 'Vivaan Saxena', 'Aanya Trivedi', 'Saanvi Kulkarni',
+  'Aaradhya Bhat', 'Meera Pillai', 'Radhika Pandey', 'Riya Chawla', 'Neha Kapoor',
+  'Devendra Singh', 'Yash Chaudhury', 'Harish Mishra', 'Sanjay Kumar', 'Rajesh Gupta',
+  'Amit Patel', 'Siddharth Roy', 'Ishaan Bose', 'Madhav Acharya', 'Ganesh Bhat',
+  'Karan Johar', 'Varun Dhawan', 'Ranbir Kapoor', 'Sid Malhotra', 'Kartik Aaryan',
+  'Deepika Padukone', 'Alia Bhatt', 'Shraddha Kapoor', 'Kriti Sanon', 'Kiara Advani',
+  'Priyanka Chopra', 'Katrina Kaif', 'Kareena Kapoor', 'Anushka Sharma', 'Sonam Kapoor',
+  'Rahul Dravid', 'Sachin Tendulkar', 'Virat Kohli', 'Rohit Sharma', 'MS Dhoni',
+  'Shikhar Dhawan', 'Hardik Pandya', 'Rishabh Pant', 'KL Rahul', 'Jasprit Bumrah',
+  'Ravindra Jadeja', 'Ravichandran Ashwin', 'Mohammed Shami', 'Yuzvendra Chahal', 'Kuldeep Yadav',
+  'Bhuvneshwar Kumar', 'Axar Patel', 'Shardul Thakur', 'Deepak Chahar', 'Shreyas Iyer',
+];
 
 async function seed() {
   console.log('Connecting to database...');
   await sequelize.authenticate();
   console.log('Database connection successful!');
 
-  // Sync schema to incorporate any model changes (e.g., fcmToken)
   console.log('Synchronizing schema...');
   await sequelize.sync({ alter: true });
   console.log('Database schema synchronized.');
 
-  // 1. Find or create the target admin user (rakesh1@gmail.com)
-  let staff = await User.findOne({ where: { email: 'rakesh1@gmail.com' } });
+  // 1. Find or create the target owner user (rakesh@gmail.com)
+  let staff = await User.findOne({ where: { email: 'rakesh@gmail.com' } });
   let workspace: Workspace | null = null;
   let branch: Branch | null = null;
 
@@ -42,7 +58,6 @@ async function seed() {
     branch = await Branch.findByPk(staff.branchId);
   }
 
-  // If workspace or branch not found from staff, fallback to find or create
   if (!workspace) {
     workspace = await Workspace.findOne();
   }
@@ -82,11 +97,11 @@ async function seed() {
     console.log(`Using Branch: ${branch.name}`);
   }
 
-  // Now, if staff (rakesh1@gmail.com) wasn't found, create them under this workspace & branch
+  // Create or update rakesh@gmail.com
   if (!staff) {
     const hashedStaffPassword = await bcrypt.hash('password123', 10);
     staff = await User.create({
-      email: 'rakesh1@gmail.com',
+      email: 'rakesh@gmail.com',
       password: hashedStaffPassword,
       name: 'Rakesh Admin',
       role: 'OWNER',
@@ -94,6 +109,13 @@ async function seed() {
       branchId: branch.id,
     } as any);
     console.log(`Created Admin User: ${staff.email}`);
+  } else {
+    // Make sure role and workspace/branch are set correctly
+    await staff.update({
+      role: UserRole.OWNER,
+      workspaceId: workspace.id,
+      branchId: branch.id,
+    });
   }
 
   // 4. Find or create Shifts
@@ -129,7 +151,7 @@ async function seed() {
     plans.push(p);
   }
 
-  // 6. Find or create Floor, Room, and Seats
+  // 6. Find or create Floor, Room
   let floor = await Floor.findOne({ where: { branchId: branch.id } });
   if (!floor) {
     floor = await Floor.create({
@@ -147,20 +169,32 @@ async function seed() {
     console.log(`Created Room: ${room.name}`);
   }
 
+  // Delete all existing seat allocations and seats to start with a fresh slate
+  console.log('Cleaning up existing seat allocations and seats...');
+  await SeatAllocation.destroy({ where: {} });
+  await Seat.destroy({ where: {} });
+
+  // Create exactly 100 seats
   const seats: Seat[] = [];
-  for (let i = 1; i <= 60; i++) {
-    const number = `A-${i}`;
-    let seat = await Seat.findOne({ where: { roomId: room.id, number } });
-    if (!seat) {
-      seat = await Seat.create({
-        roomId: room.id,
-        number,
-        status: 'AVAILABLE',
-      } as any);
+  for (let i = 1; i <= 100; i++) {
+    const number = `${i}`;
+    let status = 'AVAILABLE';
+    // 5 seats under maintenance (Seats 96 to 100)
+    if (i >= 96) {
+      status = 'BLOCKED';
+    } else if (i <= 65) {
+      // Seats 1 to 65 will be occupied
+      status = 'OCCUPIED';
     }
+
+    const seat = await Seat.create({
+      roomId: room.id,
+      number,
+      status,
+    } as any);
     seats.push(seat);
   }
-  console.log(`Ensured 60 seats exist in Room ${room.name}.`);
+  console.log('Created exactly 100 seats (1-100).');
 
   // 7. Find or create Books in library
   const bookData = [
@@ -180,10 +214,7 @@ async function seed() {
     books.push(book);
   }
 
-  // 8. Admin user confirmation
-  console.log(`Using Admin user: ${staff.email} for resolving complaints/issuing books.`);
-
-  // 9. Clear any previous seeded students to run cleanly
+  // 8. Clear any previous seeded students
   console.log('Cleaning up previously seeded students...');
   const existingSeededUsers = await User.findAll({
     where: {
@@ -198,7 +229,6 @@ async function seed() {
       await Attendance.destroy({ where: { studentProfileId: profile.id } });
       await Complaint.destroy({ where: { studentProfileId: profile.id } });
       await BookIssue.destroy({ where: { studentProfileId: profile.id } });
-      await SeatAllocation.destroy({ where: { studentProfileId: profile.id } });
       await StudentSubscription.destroy({ where: { studentProfileId: profile.id } });
       await Payment.destroy({ where: { studentProfileId: profile.id } });
       await StudentProfile.destroy({ where: { id: profile.id } });
@@ -207,26 +237,14 @@ async function seed() {
   }
   console.log(`Removed ${existingSeededUsers.length} old seeded students.`);
 
-  // Reset seat statuses to AVAILABLE before allocation
-  for (const seat of seats) {
-    seat.status = 'AVAILABLE' as any;
-    await seat.save();
-  }
-
-  // 10. Seed 50 Students
-  console.log('Seeding 50 students...');
+  // 9. Seed 65 Students to match occupied seats (1 to 65)
+  console.log('Seeding 65 students...');
   const hashedStudentPassword = await bcrypt.hash('password123', 10);
 
-  for (let i = 1; i <= 50; i++) {
+  for (let i = 1; i <= 65; i++) {
     const email = `student${i}@studyflow.com`;
-    const name = `Student ${i}`;
+    const name = INDIAN_NAMES[(i - 1) % INDIAN_NAMES.length];
     const mobile = `9876543${String(i).padStart(3, '0')}`;
-
-    // Status: APPROVED (1-35), PENDING (36-43), WAITLISTED (44-48), REJECTED (49-50)
-    let status = 'APPROVED';
-    if (i > 35 && i <= 43) status = 'PENDING';
-    else if (i > 43 && i <= 48) status = 'WAITLISTED';
-    else if (i > 48) status = 'REJECTED';
 
     const user = await User.create({
       email,
@@ -241,213 +259,72 @@ async function seed() {
     const profile = await StudentProfile.create({
       userId: user.id,
       branchId: branch.id,
-      guardianName: `Guardian of Student ${i}`,
+      guardianName: `Guardian of ${name}`,
       guardianMobile: `9112233${String(i).padStart(3, '0')}`,
       aadharNumber: `1234567890${String(i).padStart(2, '0')}`,
       joiningDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-      status,
+      status: 'APPROVED',
       qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${user.id}`,
     } as any);
 
-    // Only set up subscriptions, seats, payments, and library stuff for APPROVED students
-    if (status === 'APPROVED') {
-      // Subscriptions distribution:
-      // Active Subscriptions (i <= 25)
-      // Expired Subscriptions (26 <= i <= 30)
-      // Upcoming Subscriptions (31 <= i <= 35)
-      let subType = '';
-      if (i <= 25) subType = 'ACTIVE';
-      else if (i <= 30) subType = 'EXPIRED';
-      else if (i <= 35) subType = 'UPCOMING';
+    // Distribution:
+    // 1. Active: Seats 1 - 25 (25 students) -> ACTIVE subscription expiring in 15 days
+    // 2. Expiring Soon: Seats 26 - 55 (30 students) -> ACTIVE subscription expiring in 3 days (<= 7 days)
+    // 3. Expired: Seats 56 - 65 (10 students) -> EXPIRED subscription expiring 10 days ago
+    let startDate = new Date();
+    let endDate = new Date();
+    let subStatus = 'ACTIVE';
 
-      if (subType) {
-        const plan = plans[i % plans.length];
-        let startDate = new Date();
-        let endDate = new Date();
-        let subStatus = 'ACTIVE';
-        let isFrozen = false;
-        let freezeDate: Date | null = null;
-
-        if (subType === 'ACTIVE') {
-          startDate = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000); // 10 days ago
-          endDate = new Date(Date.now() + (plan.durationDays - 10) * 24 * 60 * 60 * 1000);
-
-          // Freeze a few active ones (e.g. 24, 25)
-          if (i >= 24) {
-            subStatus = 'FROZEN';
-            isFrozen = true;
-            freezeDate = new Date();
-          }
-        } else if (subType === 'EXPIRED') {
-          startDate = new Date(Date.now() - (plan.durationDays + 15) * 24 * 60 * 60 * 1000);
-          endDate = new Date(Date.now() - 15 * 24 * 60 * 60 * 1000);
-          subStatus = 'EXPIRED';
-        } else if (subType === 'UPCOMING') {
-          startDate = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000); // in 2 days
-          endDate = new Date(Date.now() + (plan.durationDays + 2) * 24 * 60 * 60 * 1000);
-          subStatus = 'ACTIVE';
-        }
-
-        await StudentSubscription.create({
-          studentProfileId: profile.id,
-          subscriptionPlanId: plan.id,
-          startDate,
-          endDate,
-          status: subStatus,
-          isFrozen,
-          freezeDate,
-        } as any);
-
-        // Payments
-        let payStatus = 'PAID';
-        let payMethod = 'UPI';
-        if (subType === 'UPCOMING' && i % 2 === 0) payStatus = 'UNPAID';
-        else if (subType === 'UPCOMING') payStatus = 'PARTIAL';
-
-        if (i % 3 === 0) payMethod = 'CASH';
-        else if (i % 3 === 1) payMethod = 'RAZORPAY';
-
-        await Payment.create({
-          studentProfileId: profile.id,
-          amount: plan.price,
-          status: payStatus,
-          method: payMethod,
-          transactionId: payStatus === 'PAID' ? `TXN_${Date.now()}_${i}` : null,
-          dueDate: payStatus !== 'PAID' ? startDate : null,
-          paidAt: payStatus === 'PAID' ? new Date(startDate.getTime() + 60 * 60 * 1000) : null,
-        } as any);
-
-        // Seat allocations:
-        // Active seat allocation (i <= 20)
-        // Past seat allocation (21 <= i <= 30)
-        let seatAllocType = '';
-        if (i <= 20) seatAllocType = 'ACTIVE';
-        else if (i > 20 && i <= 30) seatAllocType = 'PAST';
-
-        if (seatAllocType) {
-          const seat = seats[i - 1];
-          const shift = shifts[i % shifts.length];
-          const isActiveAlloc = seatAllocType === 'ACTIVE';
-
-          await SeatAllocation.create({
-            studentProfileId: profile.id,
-            seatId: seat.id,
-            shiftId: shift.id,
-            startDate: subType === 'EXPIRED' ? new Date(Date.now() - 45 * 24 * 60 * 60 * 1000) : startDate,
-            endDate: subType === 'EXPIRED' ? new Date(Date.now() - 15 * 24 * 60 * 60 * 1000) : endDate,
-            isActive: isActiveAlloc,
-          } as any);
-
-          if (isActiveAlloc) {
-            seat.status = 'OCCUPIED' as any;
-            await seat.save();
-          }
-        }
-      }
+    if (i <= 25) {
+      // Active (25)
+      startDate = new Date(Date.now() - 15 * 24 * 60 * 60 * 1000);
+      endDate = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000);
+      subStatus = 'ACTIVE';
+    } else if (i <= 55) {
+      // Expiring soon (30)
+      startDate = new Date(Date.now() - 27 * 24 * 60 * 60 * 1000);
+      endDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+      subStatus = 'ACTIVE';
+    } else {
+      // Expired (10)
+      startDate = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000);
+      endDate = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+      subStatus = 'EXPIRED';
     }
 
-    // Attendance configuration:
-    // Checked In today: 1 to 15
-    // Checked Out today: 16 to 30
-    // Past History only: 31 to 40
-    let attendanceType = '';
-    if (i <= 15) attendanceType = 'CHECKED_IN';
-    else if (i <= 30) attendanceType = 'CHECKED_OUT';
-    else if (i <= 40) attendanceType = 'HISTORY';
+    const plan = plans[i % plans.length];
+    await StudentSubscription.create({
+      studentProfileId: profile.id,
+      subscriptionPlanId: plan.id,
+      startDate,
+      endDate,
+      status: subStatus,
+    } as any);
 
-    if (attendanceType === 'CHECKED_IN') {
-      await Attendance.create({
-        studentProfileId: profile.id,
-        date: new Date(),
-        checkIn: new Date(Date.now() - 3 * 60 * 60 * 1000), // checked in 3h ago
-        method: 'APP_CHECK_IN',
-      } as any);
-    } else if (attendanceType === 'CHECKED_OUT') {
-      await Attendance.create({
-        studentProfileId: profile.id,
-        date: new Date(),
-        checkIn: new Date(Date.now() - 6 * 60 * 60 * 1000),
-        checkOut: new Date(Date.now() - 2 * 60 * 60 * 1000),
-        method: 'QR_CODE',
-      } as any);
-    }
+    // Create Payment
+    await Payment.create({
+      studentProfileId: profile.id,
+      amount: plan.price,
+      status: 'PAID',
+      method: 'UPI',
+      transactionId: `TXN_${Date.now()}_${i}`,
+      paidAt: new Date(startDate.getTime() + 60 * 60 * 1000),
+    } as any);
 
-    // Add general historical record for attendance
-    if (attendanceType === 'CHECKED_IN' || attendanceType === 'CHECKED_OUT' || attendanceType === 'HISTORY') {
-      await Attendance.create({
-        studentProfileId: profile.id,
-        date: new Date(Date.now() - 24 * 60 * 60 * 1000), // yesterday
-        checkIn: new Date(Date.now() - 29 * 60 * 60 * 1000),
-        checkOut: new Date(Date.now() - 23 * 60 * 60 * 1000),
-        method: 'MANUAL',
-      } as any);
-    }
-
-    // Complaints configuration:
-    // Open: 1 to 10
-    // Resolved: 11 to 15
-    let complaintType = '';
-    if (i <= 10) complaintType = 'OPEN';
-    else if (i > 10 && i <= 15) complaintType = 'RESOLVED';
-
-    if (complaintType === 'OPEN') {
-      const categories = ['ELECTRICITY', 'INTERNET', 'CLEANLINESS', 'SEAT_ISSUE', 'OTHER'];
-      await Complaint.create({
-        studentProfileId: profile.id,
-        category: categories[i % categories.length],
-        description: `Test complaint from student ${i} regarding ${categories[i % categories.length].toLowerCase()} issues in the study hall.`,
-        status: 'OPEN',
-      } as any);
-    } else if (complaintType === 'RESOLVED') {
-      await Complaint.create({
-        studentProfileId: profile.id,
-        category: 'INTERNET',
-        description: `WiFi not connecting for student ${i}.`,
-        status: 'RESOLVED',
-        resolvedById: staff.id,
-      } as any);
-    }
-
-    // Library Book Issues:
-    // Issued/Active: 5 to 19
-    // Returned: 20 to 29
-    let bookIssueType = '';
-    if (i >= 5 && i <= 19) bookIssueType = 'ISSUED';
-    else if (i >= 20 && i <= 29) bookIssueType = 'RETURNED';
-
-    if (bookIssueType === 'ISSUED') {
-      const book = books[i % books.length];
-      // Some overdue ones (e.g. 5, 6, 7)
-      let issuedAt = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
-      let dueDate = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
-      if (i <= 7) {
-        issuedAt = new Date(Date.now() - 15 * 24 * 60 * 60 * 1000);
-        dueDate = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000); // overdue by 5 days
-      }
-
-      await BookIssue.create({
-        bookId: book.id,
-        studentProfileId: profile.id,
-        issuedById: staff.id,
-        issuedAt,
-        dueDate,
-        status: 'ISSUED',
-      } as any);
-    } else if (bookIssueType === 'RETURNED') {
-      const book = books[i % books.length];
-      await BookIssue.create({
-        bookId: book.id,
-        studentProfileId: profile.id,
-        issuedById: staff.id,
-        issuedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
-        dueDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-        returnedAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000),
-        status: 'RETURNED',
-      } as any);
-    }
+    // Allocate Seat
+    const seat = seats[i - 1];
+    const shift = shifts[i % shifts.length];
+    await SeatAllocation.create({
+      studentProfileId: profile.id,
+      seatId: seat.id,
+      shiftId: shift.id,
+      startDate,
+      endDate,
+      isActive: true,
+    } as any);
   }
 
-  console.log('Successfully seeded 50 students with varied scenarios!');
+  console.log('Successfully seeded 100 seats and 65 students with Indian names under rakesh@gmail.com!');
   process.exit(0);
 }
 
@@ -455,3 +332,4 @@ seed().catch((err) => {
   console.error('Error during seeding:', err);
   process.exit(1);
 });
+

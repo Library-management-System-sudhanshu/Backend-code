@@ -9,6 +9,7 @@ import { Shift } from '../models/shift.model';
 import { StudentSubscription } from '../models/student-subscription.model';
 import { Payment } from '../models/payment.model';
 import { NotFoundException, BadRequestException } from '../middlewares/error.middleware';
+import sequelize from '../config/database';
 
 export class StudentService {
   async listStudents(workspaceId: string, query: any) {
@@ -17,12 +18,48 @@ export class StudentService {
 
     const userWhere: any = { workspaceId };
     if (search) {
-      userWhere.name = { [Op.iLike]: `%${search}%` };
+      userWhere[Op.or] = [
+        { name: { [Op.iLike]: `%${search}%` } },
+        { email: { [Op.iLike]: `%${search}%` } },
+      ];
     }
 
     const profileWhere: any = {};
     if (branchId) profileWhere.branchId = branchId;
     if (status) profileWhere.status = status;
+
+    const { filterShiftId, filterExpiration } = query;
+    const allocationWhere: any = { isActive: true };
+    if (filterShiftId) {
+      allocationWhere.shiftId = filterShiftId;
+    }
+
+    let requiredAllocation = filterShiftId ? true : false;
+    if (filterExpiration) {
+      if (filterExpiration === 'NO_SEAT') {
+        profileWhere.id = {
+          [Op.notIn]: sequelize.literal(`(
+            SELECT "studentProfileId" 
+            FROM "seat_allocations" 
+            WHERE "isActive" = true
+          )`)
+        };
+      } else {
+        requiredAllocation = true;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        if (filterExpiration === 'ACTIVE') {
+          allocationWhere.endDate = { [Op.gte]: today };
+        } else if (filterExpiration === 'EXPIRED') {
+          allocationWhere.endDate = { [Op.lt]: today };
+        } else if (filterExpiration === 'EXPIRING_SOON') {
+          const sevenDaysLater = new Date(today);
+          sevenDaysLater.setDate(today.getDate() + 7);
+          allocationWhere.endDate = { [Op.between]: [today, sevenDaysLater] };
+        }
+      }
+    }
 
     const { rows, count } = await StudentProfile.findAndCountAll({
       where: profileWhere,
@@ -30,17 +67,22 @@ export class StudentService {
         {
           model: User,
           where: userWhere,
-          attributes: ['id', 'name', 'email', 'mobile', 'avatar'],
+          attributes: ['id', 'name', 'email', 'mobile', 'avatar', 'rawPassword'],
         },
         {
           model: SeatAllocation,
-          required: false,
-          where: { isActive: true },
+          required: requiredAllocation,
+          where: allocationWhere,
           include: [
             { model: Seat },
             { model: Shift },
           ]
         },
+        {
+          model: StudentSubscription,
+          required: false,
+          include: [{ all: true }]
+        }
       ],
       limit: Number(limit),
       offset: Number(offset),
@@ -58,7 +100,7 @@ export class StudentService {
   async getStudentById(id: string) {
     const student = await StudentProfile.findByPk(id, {
       include: [
-        { model: User, attributes: ['id', 'name', 'email', 'mobile', 'avatar'] },
+        { model: User, attributes: ['id', 'name', 'email', 'mobile', 'avatar', 'rawPassword'] },
         { model: Branch },
         { model: SeatAllocation, include: [{ all: true }] },
         { model: StudentSubscription, include: [{ all: true }] },
@@ -73,7 +115,7 @@ export class StudentService {
     const student = await StudentProfile.findOne({
       where: { userId },
       include: [
-        { model: User, attributes: ['id', 'name', 'email', 'mobile', 'avatar'] },
+        { model: User, attributes: ['id', 'name', 'email', 'mobile', 'avatar', 'rawPassword'] },
         { model: Branch },
         { model: SeatAllocation, include: [{ all: true }] },
         { model: StudentSubscription, include: [{ all: true }] },
@@ -95,6 +137,7 @@ export class StudentService {
     const user = await User.create({
       email: data.email,
       password: hashedPassword,
+      rawPassword: data.password || 'Student@123',
       name: data.name,
       mobile: data.mobile,
       role: 'STUDENT',
@@ -146,6 +189,7 @@ export class StudentService {
 
     if (data.password) {
       userUpdates.password = await bcrypt.hash(data.password, 10);
+      userUpdates.rawPassword = data.password;
     }
 
     await user.update(userUpdates);

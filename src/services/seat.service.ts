@@ -42,7 +42,17 @@ export class SeatService {
   }
 
   async addSeat(roomId: string, number: string) {
-    return Seat.create({ roomId, number, status: SeatStatus.AVAILABLE } as any);
+    const trimmedNumber = number.trim();
+    const existing = await Seat.findOne({
+      where: {
+        roomId,
+        number: trimmedNumber
+      }
+    });
+    if (existing) {
+      throw new BadRequestException(`Seat number "${trimmedNumber}" already exists in this room.`);
+    }
+    return Seat.create({ roomId, number: trimmedNumber, status: SeatStatus.AVAILABLE } as any);
   }
 
   async updateSeatStatus(seatId: string, status: SeatStatus) {
@@ -103,6 +113,13 @@ export class SeatService {
     if (!floor) throw new NotFoundException('Floor not found');
     await floor.update({ name });
     return floor;
+  }
+
+  async updateRoom(roomId: string, name: string) {
+    const room = await Room.findByPk(roomId);
+    if (!room) throw new NotFoundException('Room not found');
+    await room.update({ name });
+    return room;
   }
 
   async allocateSeat(data: any) {
@@ -210,7 +227,20 @@ export class SeatService {
     return { expiredCount: expiredAllocations.length };
   }
 
-  async updateLayout(roomId: string, layout: Array<{ id: string; x: number; y: number }>) {
+  async updateLayout(
+    roomId: string,
+    layout: Array<{ id: string; x: number; y: number }>,
+    canvasWidth?: number,
+    canvasHeight?: number
+  ) {
+    // Update room dimensions if provided
+    if (canvasWidth !== undefined && canvasHeight !== undefined) {
+      await Room.update(
+        { canvasWidth, canvasHeight },
+        { where: { id: roomId } }
+      );
+    }
+
     const updatedIds = [];
     for (const item of layout) {
       const [updatedCount] = await Seat.update(
@@ -222,5 +252,16 @@ export class SeatService {
       }
     }
     return { success: true, updatedCount: updatedIds.length };
+  }
+
+  async updateAllocation(allocationId: string, data: { startDate?: string; endDate?: string }) {
+    const allocation = await SeatAllocation.findByPk(allocationId);
+    if (!allocation) throw new NotFoundException('Allocation not found');
+    
+    if (data.startDate) allocation.startDate = new Date(data.startDate);
+    if (data.endDate) allocation.endDate = new Date(data.endDate);
+    
+    await allocation.save();
+    return allocation;
   }
 }
