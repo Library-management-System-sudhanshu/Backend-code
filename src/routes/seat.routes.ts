@@ -75,19 +75,19 @@ router.patch(
 
 router.post(
   '/allocate',
-  requireRoles('OWNER', 'MANAGER', 'STAFF'),
+  requireRoles('OWNER', 'MANAGER', 'STAFF', 'STUDENT'),
   (req, res, next) => controller.allocateSeat(req, res, next)
 );
 
 router.post(
   '/transfer',
-  requireRoles('OWNER', 'MANAGER', 'STAFF'),
+  requireRoles('OWNER', 'MANAGER', 'STAFF', 'STUDENT'),
   (req, res, next) => controller.transferSeat(req, res, next)
 );
 
 router.post(
   '/:id/vacate',
-  requireRoles('OWNER', 'MANAGER', 'STAFF'),
+  requireRoles('OWNER', 'MANAGER', 'STAFF', 'STUDENT'),
   (req, res, next) => controller.vacateSeat(req, res, next)
 );
 

@@ -32,6 +32,9 @@ export class ComplaintService {
   async getStudentComplaints(studentProfileId: string) {
     return Complaint.findAll({
       where: { studentProfileId },
+      include: [
+        { model: User, as: 'resolvedBy', attributes: ['id', 'name', 'email'] }
+      ],
       order: [['createdAt', 'DESC']],
     });
   }

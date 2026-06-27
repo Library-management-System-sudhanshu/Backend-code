@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { SeatService } from '../services/seat.service';
+import { StudentProfile, SeatAllocation } from '../models';
+import { AuthenticatedRequest } from '../middlewares/auth.middleware';
 
 const seatService = new SeatService();
 
@@ -96,6 +98,15 @@ export class SeatController {
 
   async allocateSeat(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
+      const authReq = req as AuthenticatedRequest;
+      if (authReq.user?.role === 'STUDENT') {
+        const profile = await StudentProfile.findOne({ where: { userId: authReq.user.id } });
+        if (!profile) {
+          res.status(404).json({ message: 'Student profile not found' });
+          return;
+        }
+        req.body.studentProfileId = profile.id;
+      }
       const result = await seatService.allocateSeat(req.body);
       res.status(201).json(result);
     } catch (error) {
@@ -105,6 +116,19 @@ export class SeatController {
 
   async transferSeat(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
+      const authReq = req as AuthenticatedRequest;
+      if (authReq.user?.role === 'STUDENT') {
+        const profile = await StudentProfile.findOne({ where: { userId: authReq.user.id } });
+        if (!profile) {
+          res.status(404).json({ message: 'Student profile not found' });
+          return;
+        }
+        const allocation = await SeatAllocation.findByPk(req.body.allocationId);
+        if (!allocation || allocation.studentProfileId !== profile.id || !allocation.isActive) {
+          res.status(403).json({ message: 'Forbidden: You can only transfer your own active seat' });
+          return;
+        }
+      }
       const result = await seatService.transferSeat(req.body.allocationId, req.body.targetSeatId);
       res.status(200).json(result);
     } catch (error) {
@@ -114,6 +138,21 @@ export class SeatController {
 
   async vacateSeat(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
+      const authReq = req as AuthenticatedRequest;
+      if (authReq.user?.role === 'STUDENT') {
+        const profile = await StudentProfile.findOne({ where: { userId: authReq.user.id } });
+        if (!profile) {
+          res.status(404).json({ message: 'Student profile not found' });
+          return;
+        }
+        const allocation = await SeatAllocation.findOne({
+          where: { seatId: req.params.id, studentProfileId: profile.id, isActive: true }
+        });
+        if (!allocation) {
+          res.status(403).json({ message: 'Forbidden: You can only vacate your own active seat' });
+          return;
+        }
+      }
       const result = await seatService.vacateSeat((req.params.id as string));
       res.status(200).json(result);
     } catch (error) {

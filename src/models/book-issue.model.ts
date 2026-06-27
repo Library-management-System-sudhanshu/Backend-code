@@ -4,6 +4,7 @@ import { StudentProfile } from './student-profile.model';
 import { User } from './user.model';
 
 export enum BookIssueStatus {
+  REQUESTED = 'REQUESTED',
   ISSUED = 'ISSUED',
   RETURNED = 'RETURNED',
   LOST = 'LOST',
@@ -33,7 +34,7 @@ export class BookIssue extends Model<BookIssue> {
   studentProfile: StudentProfile;
 
   @ForeignKey(() => User)
-  @Column({ type: DataType.UUID, allowNull: false })
+  @Column({ type: DataType.UUID, allowNull: true })
   issuedById: string;
 
   @BelongsTo(() => User, 'issuedById')
@@ -42,16 +43,16 @@ export class BookIssue extends Model<BookIssue> {
   @Column({ type: DataType.DATE, allowNull: false, defaultValue: DataType.NOW })
   issuedAt: Date;
 
-  @Column({ type: DataType.DATE, allowNull: false })
+  @Column({ type: DataType.DATE, allowNull: true })
   dueDate: Date;
 
   @Column({ type: DataType.DATE, allowNull: true })
   returnedAt: Date;
 
   @Column({
-    type: DataType.ENUM('ISSUED', 'RETURNED', 'LOST'),
+    type: DataType.ENUM('REQUESTED', 'ISSUED', 'RETURNED', 'LOST'),
     allowNull: false,
-    defaultValue: 'ISSUED',
+    defaultValue: 'REQUESTED',
   })
   status: BookIssueStatus;
 

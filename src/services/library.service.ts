@@ -99,4 +99,18 @@ export class LibraryService {
       order: [['createdAt', 'DESC']],
     });
   }
+
+  async requestBook(bookId: string, studentProfileId: string) {
+    const book = await Book.findByPk(bookId);
+    if (!book) throw new NotFoundException('Book not found');
+    if (book.quantity <= 0) throw new BadRequestException('Book is currently out of stock');
+
+    const issue = await BookIssue.create({
+      bookId,
+      studentProfileId,
+      status: BookIssueStatus.REQUESTED,
+    } as any);
+
+    return issue;
+  }
 }

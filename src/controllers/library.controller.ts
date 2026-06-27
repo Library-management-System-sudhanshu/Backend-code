@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { LibraryService } from '../services/library.service';
+import { StudentProfile } from '../models';
+import { AuthenticatedRequest } from '../middlewares/auth.middleware';
 
 const libraryService = new LibraryService();
 
@@ -75,6 +77,25 @@ export class LibraryController {
     try {
       const result = await libraryService.getStudentIssuedBooks((req.params.studentProfileId as string));
       res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async requestBook(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const authReq = req as AuthenticatedRequest;
+      let studentProfileId = req.body.studentProfileId;
+      if (authReq.user?.role === 'STUDENT') {
+        const profile = await StudentProfile.findOne({ where: { userId: authReq.user.id } });
+        if (!profile) {
+          res.status(404).json({ message: 'Student profile not found' });
+          return;
+        }
+        studentProfileId = profile.id;
+      }
+      const result = await libraryService.requestBook(req.body.bookId, studentProfileId);
+      res.status(201).json(result);
     } catch (error) {
       next(error);
     }

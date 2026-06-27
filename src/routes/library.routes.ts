@@ -60,4 +60,10 @@ router.get(
   (req, res, next) => controller.getStudentIssuedBooks(req, res, next)
 );
 
+router.post(
+  '/books/request',
+  requireRoles('STUDENT', 'OWNER', 'MANAGER', 'STAFF'),
+  (req, res, next) => controller.requestBook(req, res, next)
+);
+
 export default router;
