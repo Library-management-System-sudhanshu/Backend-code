@@ -48,6 +48,10 @@ export const errorHandler = (
     status = 400;
     message = err.errors ? err.errors.map((e: any) => e.message).join(', ') : err.message;
     errorName = 'ValidationError';
+  } else if (err.name === 'SequelizeDatabaseError' && err.parent?.code === '22P02') {
+    status = 400;
+    message = 'Invalid UUID format or syntax error';
+    errorName = 'BadRequestError';
   }
 
   // Log the error details for debugging

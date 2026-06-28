@@ -40,6 +40,12 @@ export class StudentProfile extends Model<StudentProfile> {
   @Column({ type: DataType.STRING, allowNull: true })
   aadharNumber: string;
 
+  @Column({ type: DataType.STRING, allowNull: true })
+  gender: string;
+
+  @Column({ type: DataType.TEXT, allowNull: true })
+  address: string;
+
   @Column({ type: DataType.DATE, defaultValue: DataType.NOW })
   joiningDate: Date;
 

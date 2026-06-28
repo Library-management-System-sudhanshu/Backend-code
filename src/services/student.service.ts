@@ -8,6 +8,7 @@ import { Seat } from '../models/seat.model';
 import { Shift } from '../models/shift.model';
 import { StudentSubscription } from '../models/student-subscription.model';
 import { Payment } from '../models/payment.model';
+import { SubscriptionPlan } from '../models/subscription-plan.model';
 import { NotFoundException, BadRequestException } from '../middlewares/error.middleware';
 import sequelize from '../config/database';
 
@@ -156,10 +157,81 @@ export class StudentService {
       guardianName: data.guardianName,
       guardianMobile: data.guardianMobile,
       aadharNumber: data.aadharNumber,
+      gender: data.gender || null,
+      address: data.address || null,
       status: isSelfRegistration ? 'PENDING' : 'APPROVED',
       qrCodeUrl,
       joiningDate: new Date(),
     } as any);
+
+    // Create subscription and payment if plan is selected
+    if (data.subscriptionPlanId) {
+      const plan = await SubscriptionPlan.findByPk(data.subscriptionPlanId);
+      if (plan) {
+        const startDate = new Date();
+        const endDate = new Date(startDate.getTime() + plan.durationDays * 24 * 60 * 60 * 1000);
+        await StudentSubscription.create({
+          studentProfileId: profile.id,
+          subscriptionPlanId: data.subscriptionPlanId,
+          startDate,
+          endDate,
+          status: 'ACTIVE',
+        } as any);
+
+        await Payment.create({
+          studentProfileId: profile.id,
+          amount: plan.price,
+          method: 'CASH',
+          status: 'PAID',
+          paidAt: new Date(),
+          transactionId: `CASH-REG-${Date.now()}`,
+          invoiceUrl: `https://studyflow-receipts.s3.amazonaws.com/invoice_${Date.now()}.pdf`,
+          dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        } as any);
+      }
+    } else if (data.shiftId) {
+      const shift = await Shift.findByPk(data.shiftId);
+      if (shift) {
+        // Find or create a SubscriptionPlan corresponding to this shift
+        let plan = await SubscriptionPlan.findOne({
+          where: {
+            name: `${shift.name} Plan`,
+            workspaceId: data.workspaceId,
+            price: shift.price,
+          },
+        });
+        if (!plan) {
+          plan = await SubscriptionPlan.create({
+            name: `${shift.name} Plan`,
+            workspaceId: data.workspaceId,
+            price: shift.price,
+            durationDays: 30, // Default to monthly
+            isActive: true,
+          } as any);
+        }
+
+        const startDate = new Date();
+        const endDate = new Date(startDate.getTime() + plan.durationDays * 24 * 60 * 60 * 1000);
+        await StudentSubscription.create({
+          studentProfileId: profile.id,
+          subscriptionPlanId: plan.id,
+          startDate,
+          endDate,
+          status: 'ACTIVE',
+        } as any);
+
+        await Payment.create({
+          studentProfileId: profile.id,
+          amount: shift.price,
+          method: 'CASH',
+          status: 'PAID',
+          paidAt: new Date(),
+          transactionId: `CASH-REG-SHIFT-${Date.now()}`,
+          invoiceUrl: `https://studyflow-receipts.s3.amazonaws.com/invoice_${Date.now()}.pdf`,
+          dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        } as any);
+      }
+    }
 
     return { user, profile };
   }
@@ -198,6 +270,8 @@ export class StudentService {
       guardianName: data.guardianName ?? profile.guardianName,
       guardianMobile: data.guardianMobile ?? profile.guardianMobile,
       aadharNumber: data.aadharNumber ?? profile.aadharNumber,
+      gender: data.gender ?? profile.gender,
+      address: data.address ?? profile.address,
       branchId: data.branchId ?? profile.branchId,
       status: data.status ?? profile.status,
       joiningDate: data.joiningDate ?? profile.joiningDate,

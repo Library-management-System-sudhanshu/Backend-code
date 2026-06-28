@@ -3,15 +3,43 @@ import { StudentProfile } from '../models/student-profile.model';
 import { StudentSubscription, SubscriptionStatus } from '../models/student-subscription.model';
 import { SubscriptionPlan } from '../models/subscription-plan.model';
 import { User } from '../models/user.model';
+import { Shift } from '../models/shift.model';
 import { Op } from 'sequelize';
 import { NotFoundException } from '../middlewares/error.middleware';
 
 export class PaymentService {
   async createPayment(data: any) {
-    const { studentProfileId, amount, method, subscriptionPlanId } = data;
+    const { studentProfileId, amount, method, subscriptionPlanId, shiftId } = data;
 
     const student = await StudentProfile.findByPk(studentProfileId);
     if (!student) throw new NotFoundException('Student profile not found');
+
+    let targetPlanId = subscriptionPlanId;
+    if (shiftId) {
+      const shift = await Shift.findByPk(shiftId);
+      if (shift) {
+        const user = await User.findByPk(student.userId);
+        if (user) {
+          let plan = await SubscriptionPlan.findOne({
+            where: {
+              name: `${shift.name} Plan`,
+              workspaceId: user.workspaceId,
+              price: shift.price,
+            },
+          });
+          if (!plan) {
+            plan = await SubscriptionPlan.create({
+              name: `${shift.name} Plan`,
+              workspaceId: user.workspaceId,
+              price: shift.price,
+              durationDays: 30,
+              isActive: true,
+            } as any);
+          }
+          targetPlanId = plan.id;
+        }
+      }
+    }
 
     const payment = await Payment.create({
       studentProfileId,
@@ -25,8 +53,8 @@ export class PaymentService {
     } as any);
 
     // If it's a cash payment, directly activate the subscription
-    if (method === 'CASH' && subscriptionPlanId) {
-      await this.activateSubscription(studentProfileId, subscriptionPlanId);
+    if (method === 'CASH' && targetPlanId) {
+      await this.activateSubscription(studentProfileId, targetPlanId);
     }
 
     // Razorpay Integration Mock

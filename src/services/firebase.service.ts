@@ -1,24 +1,25 @@
-import admin from 'firebase-admin';
+import { initializeApp, cert, App } from 'firebase-admin/app';
+import { getMessaging } from 'firebase-admin/messaging';
+import fs from 'fs';
+import path from 'path';
 
-const firebaseAdmin: any = admin;
+let firebaseApp: App | null = null;
 let isFirebaseInitialized = false;
 
 try {
   const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
   if (serviceAccountJson) {
     const serviceAccount = JSON.parse(serviceAccountJson);
-    firebaseAdmin.initializeApp({
-      credential: firebaseAdmin.credential.cert(serviceAccount),
+    firebaseApp = initializeApp({
+      credential: cert(serviceAccount),
     });
     isFirebaseInitialized = true;
     console.log('[Firebase] Initialized using FIREBASE_SERVICE_ACCOUNT env credentials.');
   } else {
-    const fs = require('fs');
-    const path = require('path');
     const saPath = path.resolve(__dirname, '../../firebase-service-account.json');
     if (fs.existsSync(saPath)) {
-      firebaseAdmin.initializeApp({
-        credential: firebaseAdmin.credential.cert(saPath),
+      firebaseApp = initializeApp({
+        credential: cert(saPath),
       });
       isFirebaseInitialized = true;
       console.log('[Firebase] Initialized using firebase-service-account.json file.');
@@ -43,7 +44,7 @@ export class FirebaseService {
       return;
     }
 
-    if (!isFirebaseInitialized) {
+    if (!isFirebaseInitialized || !firebaseApp) {
       console.log(`[Firebase Simulation] Send Push Notification:
         Title: "${title}"
         Body: "${body}"
@@ -53,7 +54,7 @@ export class FirebaseService {
     }
 
     try {
-      const response = await firebaseAdmin.messaging().sendEachForMulticast({
+      const response = await getMessaging(firebaseApp).sendEachForMulticast({
         tokens: validTokens,
         notification: {
           title,
