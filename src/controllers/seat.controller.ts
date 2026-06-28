@@ -171,8 +171,8 @@ export class SeatController {
 
   async updateLayout(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { roomId, layout, canvasWidth, canvasHeight } = req.body;
-      const result = await seatService.updateLayout(roomId, layout, canvasWidth, canvasHeight);
+      const { roomId, layout, canvasWidth, canvasHeight, spacers } = req.body;
+      const result = await seatService.updateLayout(roomId, layout, canvasWidth, canvasHeight, spacers);
       res.status(200).json(result);
     } catch (error) {
       next(error);

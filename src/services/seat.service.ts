@@ -232,20 +232,34 @@ export class SeatService {
     roomId: string,
     layout: Array<{ id: string; x: number; y: number }>,
     canvasWidth?: number,
-    canvasHeight?: number
+    canvasHeight?: number,
+    spacers?: any[]
   ) {
-    // Update room dimensions if provided
+    // Update room dimensions and spacers if provided
+    const updateFields: any = {};
     if (canvasWidth !== undefined && canvasHeight !== undefined) {
+      updateFields.canvasWidth = canvasWidth;
+      updateFields.canvasHeight = canvasHeight;
+    }
+    if (spacers !== undefined) {
+      updateFields.spacers = spacers ? JSON.stringify(spacers) : null;
+    }
+
+    if (Object.keys(updateFields).length > 0) {
       await Room.update(
-        { canvasWidth, canvasHeight },
+        updateFields,
         { where: { id: roomId } }
       );
     }
 
     const updatedIds = [];
-    for (const item of layout) {
+    for (const item of layout as Array<{ id: string; x: number; y: number; rotation?: number }>) {
+      const updateData: any = { x: item.x, y: item.y };
+      if (item.rotation !== undefined) {
+        updateData.rotation = item.rotation;
+      }
       const [updatedCount] = await Seat.update(
-        { x: item.x, y: item.y },
+        updateData,
         { where: { id: item.id, roomId } }
       );
       if (updatedCount > 0) {

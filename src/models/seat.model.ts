@@ -41,6 +41,9 @@ export class Seat extends Model<Seat> {
   @Column({ type: DataType.FLOAT, allowNull: true })
   y: number | null;
 
+  @Column({ type: DataType.INTEGER, allowNull: false, defaultValue: 0 })
+  rotation: number;
+
   @HasMany(() => SeatAllocation)
   allocations: SeatAllocation[];
 }
