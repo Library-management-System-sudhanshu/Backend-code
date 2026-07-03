@@ -20,21 +20,37 @@ export class PaymentService {
       if (shift) {
         const user = await User.findByPk(student.userId);
         if (user) {
+          const durationMonths = data.durationMonths ? Number(data.durationMonths) : 1;
+          const durationDays = durationMonths * 30;
+          
+          let planName = `${shift.name} Plan`;
+          if (durationMonths === 3) {
+            planName = `${shift.name} 3-Month Plan`;
+          } else if (durationMonths === 6) {
+            planName = `${shift.name} 6-Month Plan`;
+          } else if (durationMonths !== 1) {
+            planName = `${shift.name} Plan - ${durationMonths} Months`;
+          }
+
           let plan = await SubscriptionPlan.findOne({
             where: {
-              name: `${shift.name} Plan`,
+              name: planName,
               workspaceId: user.workspaceId,
-              price: shift.price,
+              durationDays,
             },
           });
           if (!plan) {
             plan = await SubscriptionPlan.create({
-              name: `${shift.name} Plan`,
+              name: planName,
               workspaceId: user.workspaceId,
-              price: shift.price,
-              durationDays: 30,
+              price: amount,
+              durationDays,
               isActive: true,
             } as any);
+          } else {
+            if (plan.price !== amount) {
+              await plan.update({ price: amount });
+            }
           }
           targetPlanId = plan.id;
         }

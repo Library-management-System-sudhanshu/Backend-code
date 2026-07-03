@@ -8,7 +8,7 @@ import { NotFoundException } from '../middlewares/error.middleware';
 export class WorkspaceService {
   // Workspaces CRUD (Super Admin)
   async getAllWorkspaces() {
-    return Workspace.findAll({ include: [Branch] });
+    return Workspace.findAll({ include: [Branch], order: [['createdAt', 'ASC']] });
   }
 
   async getWorkspaceById(id: string) {
@@ -26,7 +26,7 @@ export class WorkspaceService {
 
   // Branches
   async getBranches(workspaceId: string) {
-    return Branch.findAll({ where: { workspaceId } });
+    return Branch.findAll({ where: { workspaceId }, order: [['createdAt', 'ASC']] });
   }
 
   async createBranch(workspaceId: string, data: any) {
@@ -42,7 +42,7 @@ export class WorkspaceService {
 
   // Shifts
   async getShifts(workspaceId: string) {
-    return Shift.findAll({ where: { workspaceId } });
+    return Shift.findAll({ where: { workspaceId }, order: [['createdAt', 'ASC']] });
   }
 
   async createShift(workspaceId: string, data: any) {
@@ -65,7 +65,7 @@ export class WorkspaceService {
 
   // Subscription Plans
   async getPlans(workspaceId: string) {
-    return SubscriptionPlan.findAll({ where: { workspaceId } });
+    return SubscriptionPlan.findAll({ where: { workspaceId }, order: [['createdAt', 'ASC']] });
   }
 
   async createPlan(workspaceId: string, data: any) {

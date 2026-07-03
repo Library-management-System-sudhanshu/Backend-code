@@ -33,6 +33,12 @@ export class Shift extends Model<Shift> {
   @Column({ type: DataType.DOUBLE, defaultValue: 0 })
   price: number;
 
+  @Column({ type: DataType.DOUBLE, allowNull: true })
+  price3Months: number | null;
+
+  @Column({ type: DataType.DOUBLE, allowNull: true })
+  price6Months: number | null;
+
   @HasMany(() => SeatAllocation)
   allocations: SeatAllocation[];
 }

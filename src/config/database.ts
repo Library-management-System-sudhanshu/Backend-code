@@ -6,6 +6,14 @@ dotenv.config();
 
 const databaseUrl = process.env.DATABASE_URL;
 
+if (databaseUrl) {
+  const matches = databaseUrl.match(/@([^/?:#]+)/);
+  const host = matches ? matches[1] : 'unknown host';
+  console.log(`[Database] Configured to connect via DATABASE_URL to host: ${host}`);
+} else {
+  console.log(`[Database] Configured to connect via individual params to host: ${process.env.DB_HOST || 'localhost'}:${process.env.DB_PORT || '5432'}`);
+}
+
 const sequelize = databaseUrl
   ? new Sequelize(databaseUrl, {
       dialect: 'postgres',
