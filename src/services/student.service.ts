@@ -129,7 +129,13 @@ export class StudentService {
   async registerStudent(data: any, isSelfRegistration = false) {
     const existingUser = await User.findOne({ where: { email: data.email } });
     if (existingUser) {
-      throw new BadRequestException('Email already in use');
+      if (existingUser.branchId && existingUser.branchId !== data.branchId) {
+        const otherBranch = await Branch.findByPk(existingUser.branchId);
+        const branchName = otherBranch ? otherBranch.name : 'another branch';
+        throw new BadRequestException(`Email is already registered in another.`);
+      } else {
+        throw new BadRequestException('Email already in use');
+      }
     }
 
     const hashedPassword = await bcrypt.hash(data.password || 'Student@123', 10);
@@ -245,7 +251,14 @@ export class StudentService {
     if (data.email && data.email !== user.email) {
       const existingUser = await User.findOne({ where: { email: data.email } });
       if (existingUser) {
-        throw new BadRequestException('Email already in use');
+        const targetBranchId = data.branchId || profile.branchId;
+        if (existingUser.branchId && existingUser.branchId !== targetBranchId) {
+          const otherBranch = await Branch.findByPk(existingUser.branchId);
+          const branchName = otherBranch ? otherBranch.name : 'another branch';
+          throw new BadRequestException(`Email is already registered in branch: ${branchName}`);
+        } else {
+          throw new BadRequestException('Email already in use');
+        }
       }
     }
 

@@ -1,11 +1,13 @@
 import { Router } from 'express';
 import { SeatController } from '../controllers/seat.controller';
 import { authenticateJWT, requireRoles } from '../middlewares/auth.middleware';
+import { tenantIsolation } from '../middlewares/tenant.middleware';
 
 const router = Router();
 const controller = new SeatController();
 
 router.use(authenticateJWT);
+router.use(tenantIsolation);
 
 router.get(
   '/map/:branchId',

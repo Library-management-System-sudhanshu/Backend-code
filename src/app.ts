@@ -1,4 +1,5 @@
 import express from 'express';
+import path from 'path';
 import apiRouter from './routes';
 import { errorHandler } from './middlewares/error.middleware';
 
@@ -6,6 +7,7 @@ const app = express();
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Sanitization middleware: strip empty string IDs to allow Sequelize defaultValue to take effect
 app.use((req, res, next) => {

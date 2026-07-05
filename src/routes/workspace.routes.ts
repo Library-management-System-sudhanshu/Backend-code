@@ -1,12 +1,14 @@
 import { Router } from 'express';
 import { WorkspaceController } from '../controllers/workspace.controller';
 import { authenticateJWT, requireRoles } from '../middlewares/auth.middleware';
+import { tenantIsolation } from '../middlewares/tenant.middleware';
 
 const router = Router();
 const controller = new WorkspaceController();
 
-// Apply auth middleware to all routes in this router
+// Apply auth & tenant isolation middleware to all routes in this router
 router.use(authenticateJWT);
+router.use(tenantIsolation);
 
 // Workspaces CRUD
 router.get('/', requireRoles('SUPER_ADMIN'), (req, res, next) => controller.getAllWorkspaces(req, res, next));
