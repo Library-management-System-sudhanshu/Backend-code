@@ -48,6 +48,9 @@ export class Payment extends Model<Payment> {
   @Column({ type: DataType.STRING, allowNull: true })
   transactionId: string;
 
+  @Column({ type: DataType.UUID, allowNull: true })
+  subscriptionPlanId: string;
+
   @Column({ type: DataType.STRING, allowNull: true })
   invoiceUrl: string;
 

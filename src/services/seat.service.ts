@@ -131,12 +131,24 @@ export class SeatService {
 
     const seat = await Seat.findByPk(seatId);
     if (!seat) throw new NotFoundException('Seat not found');
-    if (seat.status !== SeatStatus.AVAILABLE) {
-      throw new BadRequestException('Seat is not available for allocation');
+    if (seat.status === SeatStatus.BLOCKED || seat.status === SeatStatus.RESERVED) {
+      throw new BadRequestException(`Seat is ${seat.status.toLowerCase()} and cannot be allocated`);
     }
 
     const shift = await Shift.findByPk(shiftId);
     if (!shift) throw new NotFoundException('Shift not found');
+
+    // Check if there is already an active allocation for this seat and shift
+    const existingAllocation = await SeatAllocation.findOne({
+      where: {
+        seatId,
+        shiftId,
+        isActive: true,
+      },
+    });
+    if (existingAllocation) {
+      throw new BadRequestException('Seat is already occupied in this shift');
+    }
 
     // Deactivate current active allocations for this student if any
     await SeatAllocation.update(
@@ -154,7 +166,7 @@ export class SeatService {
       isActive: true,
     } as any);
 
-    // Update seat status
+    // Update seat status to OCCUPIED
     await seat.update({ status: SeatStatus.OCCUPIED });
 
     return allocation;
@@ -168,14 +180,30 @@ export class SeatService {
     const targetSeat = await Seat.findByPk(targetSeatId);
 
     if (!targetSeat) throw new NotFoundException('Target seat not found');
-    if (targetSeat.status !== SeatStatus.AVAILABLE) {
-      throw new BadRequestException('Target seat is not available');
+    if (targetSeat.status === SeatStatus.BLOCKED || targetSeat.status === SeatStatus.RESERVED) {
+      throw new BadRequestException(`Target seat is ${targetSeat.status.toLowerCase()}`);
+    }
+
+    const targetSeatShiftAlloc = await SeatAllocation.findOne({
+      where: {
+        seatId: targetSeatId,
+        shiftId: allocation.shiftId,
+        isActive: true,
+      }
+    });
+    if (targetSeatShiftAlloc) {
+      throw new BadRequestException('Target seat is already occupied in this shift');
     }
 
     // Deactivate old allocation
     await allocation.update({ isActive: false });
     if (oldSeat) {
-      await oldSeat.update({ status: SeatStatus.AVAILABLE });
+      const oldSeatActiveCount = await SeatAllocation.count({
+        where: { seatId: allocation.seatId, isActive: true }
+      });
+      if (oldSeatActiveCount === 0) {
+        await oldSeat.update({ status: SeatStatus.AVAILABLE });
+      }
     }
 
     // Create new allocation
@@ -194,16 +222,31 @@ export class SeatService {
     return newAllocation;
   }
 
-  async vacateSeat(seatId: string) {
+  async vacateSeat(seatId: string, studentProfileId?: string) {
     const seat = await Seat.findByPk(seatId);
     if (!seat) throw new NotFoundException('Seat not found');
 
+    const whereClause: any = { seatId, isActive: true };
+    if (studentProfileId) {
+      whereClause.studentProfileId = studentProfileId;
+    }
+
     await SeatAllocation.update(
       { isActive: false },
-      { where: { seatId, isActive: true } }
+      { where: whereClause }
     );
 
-    await seat.update({ status: SeatStatus.AVAILABLE });
+    // Count remaining active allocations on this seat
+    const remainingActiveCount = await SeatAllocation.count({
+      where: { seatId, isActive: true }
+    });
+
+    if (remainingActiveCount === 0) {
+      await seat.update({ status: SeatStatus.AVAILABLE });
+    } else {
+      await seat.update({ status: SeatStatus.OCCUPIED });
+    }
+
     return { success: true };
   }
 
@@ -221,7 +264,12 @@ export class SeatService {
       await alloc.update({ isActive: false });
       const seat = await Seat.findByPk(alloc.seatId);
       if (seat) {
-        await seat.update({ status: SeatStatus.AVAILABLE });
+        const remainingActiveCount = await SeatAllocation.count({
+          where: { seatId: alloc.seatId, isActive: true }
+        });
+        if (remainingActiveCount === 0) {
+          await seat.update({ status: SeatStatus.AVAILABLE });
+        }
       }
     }
 

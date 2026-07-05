@@ -36,7 +36,11 @@ export const authenticateJWT = async (
 
     req.user = user;
     next();
-  } catch (error) {
+  } catch (error: any) {
+    if (error.name === 'TokenExpiredError') {
+      res.status(401).json({ message: 'Token has expired', error: error.message });
+      return;
+    }
     res.status(401).json({ message: 'Unauthorized: Invalid or expired token', error: (error as Error).message });
   }
 };

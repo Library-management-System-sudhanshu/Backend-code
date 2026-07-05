@@ -99,6 +99,7 @@ export class SeatController {
   async allocateSeat(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const authReq = req as AuthenticatedRequest;
+      console.log("allocateSeat controller request body:", req.body);
       if (authReq.user?.role === 'STUDENT') {
         const profile = await StudentProfile.findOne({ where: { userId: authReq.user.id } });
         if (!profile) {
@@ -110,6 +111,7 @@ export class SeatController {
       const result = await seatService.allocateSeat(req.body);
       res.status(201).json(result);
     } catch (error) {
+      console.error("allocateSeat controller error caught:", error);
       next(error);
     }
   }
