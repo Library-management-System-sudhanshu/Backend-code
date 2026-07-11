@@ -13,6 +13,15 @@ export class WhatsAppController {
     }
   }
 
+  async createTemplate(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await whatsappService.createTemplate(req.body);
+      res.status(201).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async sendBroadcast(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const workspaceId = (req.body.workspaceId || req.query.workspaceId) as string;

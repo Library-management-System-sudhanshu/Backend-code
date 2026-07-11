@@ -15,6 +15,12 @@ router.get(
 );
 
 router.post(
+  '/templates',
+  requireRoles('OWNER', 'MANAGER', 'STAFF'),
+  (req, res, next) => controller.createTemplate(req, res, next)
+);
+
+router.post(
   '/broadcast',
   requireRoles('OWNER', 'MANAGER', 'STAFF'),
   tenantIsolation,

@@ -126,7 +126,8 @@ export class AuthService {
           address: user.workspace.address,
           pincode: user.workspace.pincode,
           gstNumber: user.workspace.gstNumber,
-          subdomain: user.workspace.subdomain
+          subdomain: user.workspace.subdomain,
+          logo: user.workspace.logo
         } : null
       },
     };
@@ -185,6 +186,7 @@ export class AuthService {
       if (data.address !== undefined) wsUpdate.address = data.address;
       if (data.gstNumber !== undefined) wsUpdate.gstNumber = data.gstNumber;
       if (data.pincode !== undefined) wsUpdate.pincode = data.pincode;
+      if (data.logo !== undefined) wsUpdate.logo = data.logo;
 
       if (Object.keys(wsUpdate).length > 0) {
         await user.workspace.update(wsUpdate);
@@ -208,7 +210,8 @@ export class AuthService {
         address: freshUser!.workspace.address,
         gstNumber: freshUser!.workspace.gstNumber,
         pincode: freshUser!.workspace.pincode,
-        subdomain: freshUser!.workspace.subdomain
+        subdomain: freshUser!.workspace.subdomain,
+        logo: freshUser!.workspace.logo
       } : null
     };
   }
