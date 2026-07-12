@@ -56,4 +56,10 @@ router.delete(
   (req, res, next) => controller.deleteStudent(req, res, next)
 );
 
+router.post(
+  '/:id/clear-dues',
+  requireRoles('OWNER', 'MANAGER', 'STAFF'),
+  (req, res, next) => controller.clearDues(req, res, next)
+);
+
 export default router;

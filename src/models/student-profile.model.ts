@@ -59,6 +59,9 @@ export class StudentProfile extends Model<StudentProfile> {
   @Column({ type: DataType.STRING, allowNull: true })
   qrCodeUrl: string;
 
+  @Column({ type: DataType.DOUBLE, defaultValue: 0 })
+  dueAmount: number;
+
   @HasMany(() => SeatAllocation)
   allocations: SeatAllocation[];
 

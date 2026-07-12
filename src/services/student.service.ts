@@ -168,6 +168,7 @@ export class StudentService {
       status: isSelfRegistration ? 'PENDING' : 'APPROVED',
       qrCodeUrl,
       joiningDate: new Date(),
+      dueAmount: 0,
     } as any);
 
     // Create subscription and payment if plan is selected
@@ -184,11 +185,17 @@ export class StudentService {
           status: 'ACTIVE',
         } as any);
 
+        const amountPaid = data.amountPaid !== undefined ? Number(data.amountPaid) : plan.price;
+        const dueAmount = Math.max(0, plan.price - amountPaid);
+        if (dueAmount > 0) {
+          await profile.update({ dueAmount });
+        }
+
         await Payment.create({
           studentProfileId: profile.id,
-          amount: plan.price,
+          amount: amountPaid,
           method: 'CASH',
-          status: 'PAID',
+          status: dueAmount > 0 ? 'PARTIAL' : 'PAID',
           paidAt: new Date(),
           transactionId: `CASH-REG-${Date.now()}`,
           invoiceUrl: `https://studyflow-receipts.s3.amazonaws.com/invoice_${Date.now()}.pdf`,
@@ -226,11 +233,17 @@ export class StudentService {
           status: 'ACTIVE',
         } as any);
 
+        const amountPaid = data.amountPaid !== undefined ? Number(data.amountPaid) : shift.price;
+        const dueAmount = Math.max(0, shift.price - amountPaid);
+        if (dueAmount > 0) {
+          await profile.update({ dueAmount });
+        }
+
         await Payment.create({
           studentProfileId: profile.id,
-          amount: shift.price,
+          amount: amountPaid,
           method: 'CASH',
-          status: 'PAID',
+          status: dueAmount > 0 ? 'PARTIAL' : 'PAID',
           paidAt: new Date(),
           transactionId: `CASH-REG-SHIFT-${Date.now()}`,
           invoiceUrl: `https://studyflow-receipts.s3.amazonaws.com/invoice_${Date.now()}.pdf`,
@@ -309,5 +322,27 @@ export class StudentService {
     await profile.destroy();
     await User.destroy({ where: { id: userId } });
     return { success: true };
+  }
+
+  async clearDues(id: string, amount: number, method: string) {
+    const profile = await StudentProfile.findByPk(id);
+    if (!profile) throw new NotFoundException('Student profile not found');
+
+    if (amount <= 0) throw new BadRequestException('Amount must be greater than zero');
+    if (amount > (profile.dueAmount || 0)) throw new BadRequestException('Amount exceeds due balance');
+
+    await Payment.create({
+      studentProfileId: profile.id,
+      amount,
+      method,
+      status: 'PAID',
+      paidAt: new Date(),
+      transactionId: `DUES-CLR-${Date.now()}`,
+    } as any);
+
+    profile.dueAmount = (profile.dueAmount || 0) - amount;
+    await profile.save();
+
+    return profile;
   }
 }
