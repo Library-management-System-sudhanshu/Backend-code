@@ -5,7 +5,7 @@ import { Workspace } from '../models/workspace.model';
 import { Branch } from '../models/branch.model';
 import { WorkspaceSetting } from '../models/workspace-setting.model';
 import { StudentProfile } from '../models/student-profile.model';
-import { BadRequestException, UnauthorizedException } from '../middlewares/error.middleware';
+import { BadRequestException, UnauthorizedException, ForbiddenException } from '../middlewares/error.middleware';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'studyflow_secret_key_12345';
 
@@ -77,6 +77,10 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
+    if (user.role !== 'SUPER_ADMIN' && user.workspace && !user.workspace.isActive) {
+      throw new ForbiddenException('Your workspace is disabled. Access denied.');
+    }
+
     const isMatch = await bcrypt.compare(data.password, user.password);
     if (!isMatch) {
       throw new UnauthorizedException('Invalid email or password');
@@ -96,9 +100,16 @@ export class AuthService {
   }
 
   async verifyOtp(mobile: string, otp: string) {
-    const user = await User.findOne({ where: { mobile } });
+    const user = await User.findOne({ 
+      where: { mobile },
+      include: [Workspace]
+    });
     if (!user) {
       throw new BadRequestException('Mobile number not registered');
+    }
+
+    if (user.role !== 'SUPER_ADMIN' && user.workspace && !user.workspace.isActive) {
+      throw new ForbiddenException('Your workspace is disabled. Access denied.');
     }
 
     if (otp !== '123456') {

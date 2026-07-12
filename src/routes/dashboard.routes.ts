@@ -15,4 +15,10 @@ router.get(
   (req, res, next) => controller.getMetrics(req, res, next)
 );
 
+router.get(
+  '/super-admin/metrics',
+  requireRoles('SUPER_ADMIN'),
+  (req, res, next) => controller.getSuperAdminMetrics(req, res, next)
+);
+
 export default router;

@@ -17,3 +17,5 @@ export * from './book-issue.model';
 export * from './complaint.model';
 export * from './whatsapp-log.model';
 export * from './notice.model';
+export * from './saas-plan.model';
+export * from './workspace-subscription.model';

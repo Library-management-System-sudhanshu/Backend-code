@@ -11,9 +11,17 @@ router.use(authenticateJWT);
 router.use(tenantIsolation);
 
 // Workspaces CRUD
+// Workspaces CRUD
 router.get('/', requireRoles('SUPER_ADMIN'), (req, res, next) => controller.getAllWorkspaces(req, res, next));
+router.post('/', requireRoles('SUPER_ADMIN'), (req, res, next) => controller.createWorkspace(req, res, next));
 router.get('/:id', requireRoles('SUPER_ADMIN', 'OWNER', 'MANAGER'), (req, res, next) => controller.getWorkspaceById(req, res, next));
 router.patch('/:id', requireRoles('SUPER_ADMIN', 'OWNER'), (req, res, next) => controller.updateWorkspace(req, res, next));
+
+// SaaS Subscription Management
+router.get('/:id/saas-subscription', requireRoles('SUPER_ADMIN', 'OWNER'), (req, res, next) => controller.getSaaSSubscription(req, res, next));
+router.post('/:id/start-trial', requireRoles('SUPER_ADMIN', 'OWNER'), (req, res, next) => controller.startSaaSTrial(req, res, next));
+router.post('/:id/saas-payment/create', requireRoles('SUPER_ADMIN', 'OWNER'), (req, res, next) => controller.createSaaSPayment(req, res, next));
+router.post('/:id/saas-payment/verify', requireRoles('SUPER_ADMIN', 'OWNER'), (req, res, next) => controller.verifySaaSPayment(req, res, next));
 
 // Branches
 router.get('/:workspaceId/branches', requireRoles('OWNER', 'MANAGER', 'STAFF'), (req, res, next) => controller.getBranches(req, res, next));

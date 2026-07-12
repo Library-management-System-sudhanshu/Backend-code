@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from './auth.middleware';
 import { Branch } from '../models/branch.model';
+import { Workspace } from '../models/workspace.model';
 
 export const tenantIsolation = async (
   req: AuthenticatedRequest,
@@ -10,6 +11,20 @@ export const tenantIsolation = async (
   const user = req.user;
 
   if (user && user.role !== 'SUPER_ADMIN') {
+    // Check if workspace is active
+    if (user.workspaceId) {
+      try {
+        const workspace = await Workspace.findByPk(user.workspaceId);
+        if (!workspace || !workspace.isActive) {
+          res.status(403).json({ message: 'Workspace is disabled. Access denied.' });
+          return;
+        }
+      } catch (error) {
+        res.status(500).json({ message: 'Internal server error validating workspace status' });
+        return;
+      }
+    }
+
     // 1. Path parameter validation: workspaceId
     if (req.params.workspaceId && req.params.workspaceId !== user.workspaceId) {
       res.status(403).json({ message: 'Forbidden: Access denied to this workspace' });

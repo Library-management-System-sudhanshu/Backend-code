@@ -34,6 +34,36 @@ export class SeatService {
     });
   }
 
+  async getBranchLayout(branchId: string) {
+    return Floor.findAll({
+      where: { branchId },
+      include: [
+        {
+          model: Room,
+          attributes: ['id', 'name', 'floorId'],
+        },
+      ],
+      order: [
+        ['name', 'ASC'],
+      ],
+    });
+  }
+
+  async getRoomSeats(roomId: string) {
+    return Seat.findAll({
+      where: { roomId },
+      include: [
+        {
+          model: SeatAllocation,
+          required: false,
+          where: { isActive: true },
+          include: [{ model: StudentProfile, include: [{ all: true }] }, { model: Shift }],
+        },
+      ],
+      order: [['number', 'ASC']],
+    });
+  }
+
   async addFloor(branchId: string, name: string) {
     return Floor.create({ branchId, name } as any);
   }

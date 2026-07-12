@@ -11,6 +11,7 @@ import whatsappRoutes from './whatsapp.routes';
 import dashboardRoutes from './dashboard.routes';
 import noticeRoutes from './notice.routes';
 import safetyRoutes from './safety.routes';
+import saasPlanRoutes from './saas-plan.routes';
 
 const router = Router();
 
@@ -26,6 +27,7 @@ router.use('/whatsapp', whatsappRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/notices', noticeRoutes);
 router.use('/safety', safetyRoutes);
+router.use('/saas-plans', saasPlanRoutes);
 
 import fs from 'fs';
 import path from 'path';
