@@ -1,5 +1,7 @@
-import { Table, Column, Model, DataType, ForeignKey, BelongsTo } from 'sequelize-typescript';
+import { Table, Column, Model, DataType, ForeignKey, BelongsTo, Index } from 'sequelize-typescript';
 import { StudentProfile } from './student-profile.model';
+import { Workspace } from './workspace.model';
+import { Branch } from './branch.model';
 
 export enum AttendanceMethod {
   MANUAL = 'MANUAL',
@@ -7,7 +9,15 @@ export enum AttendanceMethod {
   APP_CHECK_IN = 'APP_CHECK_IN',
 }
 
-@Table({ tableName: 'attendances' })
+@Table({
+  tableName: 'attendances',
+  paranoid: true,
+  indexes: [
+    { fields: ['studentProfileId', 'date'] },
+    { fields: ['workspaceId', 'date'] },
+    { fields: ['branchId', 'date'] },
+  ],
+})
 export class Attendance extends Model<Attendance> {
   @Column({
     type: DataType.UUID,
@@ -16,11 +26,28 @@ export class Attendance extends Model<Attendance> {
   })
   declare id: string;
 
+  @Index
+  @ForeignKey(() => Workspace)
+  @Column({ type: DataType.UUID, allowNull: false })
+  workspaceId: string;
+
+  @BelongsTo(() => Workspace, { onDelete: 'CASCADE' })
+  workspace: Workspace;
+
+  @Index
+  @ForeignKey(() => Branch)
+  @Column({ type: DataType.UUID, allowNull: false })
+  branchId: string;
+
+  @BelongsTo(() => Branch, { onDelete: 'CASCADE' })
+  branch: Branch;
+
+  @Index
   @ForeignKey(() => StudentProfile)
   @Column({ type: DataType.UUID, allowNull: false })
   studentProfileId: string;
 
-  @BelongsTo(() => StudentProfile)
+  @BelongsTo(() => StudentProfile, { onDelete: 'CASCADE' })
   studentProfile: StudentProfile;
 
   @Column({ type: DataType.DATEONLY, allowNull: false, defaultValue: DataType.NOW })

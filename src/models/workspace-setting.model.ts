@@ -14,7 +14,7 @@ export class WorkspaceSetting extends Model<WorkspaceSetting> {
   @Column({ type: DataType.UUID, allowNull: false, unique: true })
   workspaceId: string;
 
-  @BelongsTo(() => Workspace)
+  @BelongsTo(() => Workspace, { onDelete: 'CASCADE' })
   workspace: Workspace;
 
   @Column({ type: DataType.TEXT, allowNull: true })

@@ -51,7 +51,6 @@ export class WorkspaceService {
       name: ownerName,
       email: ownerEmail,
       password: hashedPassword,
-      rawPassword: ownerPassword,
       mobile: ownerMobile || null,
       role: 'OWNER'
     } as any);

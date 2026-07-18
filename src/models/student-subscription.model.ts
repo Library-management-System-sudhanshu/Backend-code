@@ -1,6 +1,7 @@
-import { Table, Column, Model, DataType, ForeignKey, BelongsTo } from 'sequelize-typescript';
+import { Table, Column, Model, DataType, ForeignKey, BelongsTo, Index } from 'sequelize-typescript';
 import { StudentProfile } from './student-profile.model';
 import { SubscriptionPlan } from './subscription-plan.model';
+import { Workspace } from './workspace.model';
 
 export enum SubscriptionStatus {
   ACTIVE = 'ACTIVE',
@@ -8,7 +9,13 @@ export enum SubscriptionStatus {
   FROZEN = 'FROZEN',
 }
 
-@Table({ tableName: 'student_subscriptions' })
+@Table({
+  tableName: 'student_subscriptions',
+  paranoid: true,
+  indexes: [
+    { fields: ['workspaceId', 'status'] },
+  ],
+})
 export class StudentSubscription extends Model<StudentSubscription> {
   @Column({
     type: DataType.UUID,
@@ -17,18 +24,28 @@ export class StudentSubscription extends Model<StudentSubscription> {
   })
   declare id: string;
 
+  @Index
+  @ForeignKey(() => Workspace)
+  @Column({ type: DataType.UUID, allowNull: false })
+  workspaceId: string;
+
+  @BelongsTo(() => Workspace, { onDelete: 'CASCADE' })
+  workspace: Workspace;
+
+  @Index
   @ForeignKey(() => StudentProfile)
   @Column({ type: DataType.UUID, allowNull: false })
   studentProfileId: string;
 
-  @BelongsTo(() => StudentProfile)
+  @BelongsTo(() => StudentProfile, { onDelete: 'CASCADE' })
   studentProfile: StudentProfile;
 
+  @Index
   @ForeignKey(() => SubscriptionPlan)
   @Column({ type: DataType.UUID, allowNull: false })
   subscriptionPlanId: string;
 
-  @BelongsTo(() => SubscriptionPlan)
+  @BelongsTo(() => SubscriptionPlan, { onDelete: 'RESTRICT' })
   plan: SubscriptionPlan;
 
   @Column({ type: DataType.DATE, allowNull: false })

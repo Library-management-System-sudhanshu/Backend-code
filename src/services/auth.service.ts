@@ -1,6 +1,7 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/user.model';
+import { UserDevice } from '../models/user-device.model';
 import { Workspace } from '../models/workspace.model';
 import { Branch } from '../models/branch.model';
 import { WorkspaceSetting } from '../models/workspace-setting.model';
@@ -144,13 +145,24 @@ export class AuthService {
     };
   }
 
-  async updateFcmToken(userId: string, fcmToken: string) {
+  async updateFcmToken(userId: string, fcmToken: string, deviceType?: string, deviceName?: string) {
     const user = await User.findByPk(userId);
     if (!user) {
       throw new BadRequestException('User not found');
     }
-    await user.update({ fcmToken });
-    return user;
+
+    // Upsert: find existing device with this token, or create a new one
+    const [device] = await UserDevice.findOrCreate({
+      where: { userId, fcmToken },
+      defaults: {
+        userId,
+        fcmToken,
+        deviceType: deviceType || null,
+        deviceName: deviceName || null,
+      } as any,
+    });
+
+    return device;
   }
 
   async getProfile(userId: string) {

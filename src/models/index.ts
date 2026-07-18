@@ -1,6 +1,7 @@
 export * from './workspace.model';
 export * from './workspace-setting.model';
 export * from './user.model';
+export * from './user-device.model';
 export * from './branch.model';
 export * from './floor.model';
 export * from './room.model';

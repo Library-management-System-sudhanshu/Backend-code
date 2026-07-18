@@ -1,6 +1,7 @@
-import { Table, Column, Model, DataType, ForeignKey, BelongsTo, HasMany } from 'sequelize-typescript';
+import { Table, Column, Model, DataType, ForeignKey, BelongsTo, HasMany, Index } from 'sequelize-typescript';
 import { User } from './user.model';
 import { Branch } from './branch.model';
+import { Workspace } from './workspace.model';
 import { SeatAllocation } from './seat-allocation.model';
 import { StudentSubscription } from './student-subscription.model';
 import { Payment } from './payment.model';
@@ -8,7 +9,20 @@ import { Attendance } from './attendance.model';
 import { Complaint } from './complaint.model';
 import { BookIssue } from './book-issue.model';
 
-@Table({ tableName: 'student_profiles' })
+export enum StudentStatus {
+  PENDING = 'PENDING',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+  WAITLISTED = 'WAITLISTED',
+}
+
+export enum Gender {
+  MALE = 'MALE',
+  FEMALE = 'FEMALE',
+  OTHER = 'OTHER',
+}
+
+@Table({ tableName: 'student_profiles', paranoid: true })
 export class StudentProfile extends Model<StudentProfile> {
   @Column({
     type: DataType.UUID,
@@ -17,18 +31,28 @@ export class StudentProfile extends Model<StudentProfile> {
   })
   declare id: string;
 
+  @Index
   @ForeignKey(() => User)
   @Column({ type: DataType.UUID, allowNull: false, unique: true })
   userId: string;
 
-  @BelongsTo(() => User)
+  @BelongsTo(() => User, { onDelete: 'CASCADE' })
   user: User;
 
+  @Index
+  @ForeignKey(() => Workspace)
+  @Column({ type: DataType.UUID, allowNull: false })
+  workspaceId: string;
+
+  @BelongsTo(() => Workspace, { onDelete: 'CASCADE' })
+  workspace: Workspace;
+
+  @Index
   @ForeignKey(() => Branch)
   @Column({ type: DataType.UUID, allowNull: false })
   branchId: string;
 
-  @BelongsTo(() => Branch)
+  @BelongsTo(() => Branch, { onDelete: 'CASCADE' })
   branch: Branch;
 
   @Column({ type: DataType.STRING, allowNull: true })
@@ -40,8 +64,11 @@ export class StudentProfile extends Model<StudentProfile> {
   @Column({ type: DataType.STRING, allowNull: true })
   aadharNumber: string;
 
-  @Column({ type: DataType.STRING, allowNull: true })
-  gender: string;
+  @Column({
+    type: DataType.ENUM('MALE', 'FEMALE', 'OTHER'),
+    allowNull: true,
+  })
+  gender: Gender;
 
   @Column({ type: DataType.TEXT, allowNull: true })
   address: string;
@@ -50,16 +77,18 @@ export class StudentProfile extends Model<StudentProfile> {
   joiningDate: Date;
 
   @Column({
-    type: DataType.STRING,
+    type: DataType.ENUM('PENDING', 'APPROVED', 'REJECTED', 'WAITLISTED'),
     allowNull: false,
-    defaultValue: 'PENDING', // PENDING, APPROVED, REJECTED, WAITLISTED
+    defaultValue: 'PENDING',
   })
-  status: string;
+  status: StudentStatus;
 
   @Column({ type: DataType.STRING, allowNull: true })
   qrCodeUrl: string;
 
-  @Column({ type: DataType.DOUBLE, defaultValue: 0 })
+  // TODO: Consider replacing with a ledger-based calculation (sum of debits - credits)
+  // to avoid race conditions and out-of-sync financial data.
+  @Column({ type: DataType.DECIMAL(10, 2), defaultValue: 0 })
   dueAmount: number;
 
   @HasMany(() => SeatAllocation)

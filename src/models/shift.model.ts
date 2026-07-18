@@ -1,8 +1,14 @@
-import { Table, Column, Model, DataType, ForeignKey, BelongsTo, HasMany } from 'sequelize-typescript';
+import { Table, Column, Model, DataType, ForeignKey, BelongsTo, HasMany, Index } from 'sequelize-typescript';
 import { Workspace } from './workspace.model';
 import { SeatAllocation } from './seat-allocation.model';
 
-@Table({ tableName: 'shifts' })
+@Table({
+  tableName: 'shifts',
+  paranoid: true,
+  indexes: [
+    { unique: true, fields: ['workspaceId', 'name'], where: { deletedAt: null } },
+  ],
+})
 export class Shift extends Model<Shift> {
   @Column({
     type: DataType.UUID,
@@ -11,11 +17,12 @@ export class Shift extends Model<Shift> {
   })
   declare id: string;
 
+  @Index
   @ForeignKey(() => Workspace)
   @Column({ type: DataType.UUID, allowNull: false })
   workspaceId: string;
 
-  @BelongsTo(() => Workspace)
+  @BelongsTo(() => Workspace, { onDelete: 'CASCADE' })
   workspace: Workspace;
 
   @Column({ type: DataType.STRING, allowNull: false })
@@ -30,13 +37,15 @@ export class Shift extends Model<Shift> {
   @Column({ type: DataType.INTEGER, allowNull: true })
   capacity: number | null;
 
-  @Column({ type: DataType.DOUBLE, defaultValue: 0 })
+  @Column({ type: DataType.DECIMAL(10, 2), defaultValue: 0 })
   price: number;
 
-  @Column({ type: DataType.DOUBLE, allowNull: true })
+  // TODO: Normalize into a ShiftPricing table to avoid repeating groups (1NF violation)
+  @Column({ type: DataType.DECIMAL(10, 2), allowNull: true })
   price3Months: number | null;
 
-  @Column({ type: DataType.DOUBLE, allowNull: true })
+  // TODO: Normalize into a ShiftPricing table to avoid repeating groups (1NF violation)
+  @Column({ type: DataType.DECIMAL(10, 2), allowNull: true })
   price6Months: number | null;
 
   @HasMany(() => SeatAllocation)

@@ -1,6 +1,6 @@
 import { Table, Column, Model, DataType } from 'sequelize-typescript';
 
-@Table({ tableName: 'saas_plans' })
+@Table({ tableName: 'saas_plans', paranoid: true })
 export class SaaSPlan extends Model<SaaSPlan> {
   @Column({
     type: DataType.UUID,
@@ -12,7 +12,7 @@ export class SaaSPlan extends Model<SaaSPlan> {
   @Column({ type: DataType.STRING, allowNull: false })
   name: string;
 
-  @Column({ type: DataType.DOUBLE, allowNull: false })
+  @Column({ type: DataType.DECIMAL(10, 2), allowNull: false })
   price: number;
 
   @Column({ type: DataType.STRING, allowNull: true })

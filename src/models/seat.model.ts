@@ -1,4 +1,4 @@
-import { Table, Column, Model, DataType, ForeignKey, BelongsTo, HasMany } from 'sequelize-typescript';
+import { Table, Column, Model, DataType, ForeignKey, BelongsTo, HasMany, Index } from 'sequelize-typescript';
 import { Room } from './room.model';
 import { SeatAllocation } from './seat-allocation.model';
 
@@ -9,7 +9,13 @@ export enum SeatStatus {
   BLOCKED = 'BLOCKED',
 }
 
-@Table({ tableName: 'seats' })
+@Table({
+  tableName: 'seats',
+  paranoid: true,
+  indexes: [
+    { unique: true, fields: ['roomId', 'number'], where: { deletedAt: null } },
+  ],
+})
 export class Seat extends Model<Seat> {
   @Column({
     type: DataType.UUID,
@@ -18,11 +24,12 @@ export class Seat extends Model<Seat> {
   })
   declare id: string;
 
+  @Index
   @ForeignKey(() => Room)
   @Column({ type: DataType.UUID, allowNull: false })
   roomId: string;
 
-  @BelongsTo(() => Room)
+  @BelongsTo(() => Room, { onDelete: 'CASCADE' })
   room: Room;
 
   @Column({ type: DataType.STRING, allowNull: false })

@@ -1,6 +1,8 @@
-import { Table, Column, Model, DataType, ForeignKey, BelongsTo } from 'sequelize-typescript';
+import { Table, Column, Model, DataType, ForeignKey, BelongsTo, Index } from 'sequelize-typescript';
 import { StudentProfile } from './student-profile.model';
 import { User } from './user.model';
+import { Workspace } from './workspace.model';
+import { Branch } from './branch.model';
 
 export enum ComplaintCategory {
   ELECTRICITY = 'ELECTRICITY',
@@ -15,7 +17,7 @@ export enum ComplaintStatus {
   RESOLVED = 'RESOLVED',
 }
 
-@Table({ tableName: 'complaints' })
+@Table({ tableName: 'complaints', paranoid: true })
 export class Complaint extends Model<Complaint> {
   @Column({
     type: DataType.UUID,
@@ -24,11 +26,28 @@ export class Complaint extends Model<Complaint> {
   })
   declare id: string;
 
+  @Index
+  @ForeignKey(() => Workspace)
+  @Column({ type: DataType.UUID, allowNull: false })
+  workspaceId: string;
+
+  @BelongsTo(() => Workspace, { onDelete: 'CASCADE' })
+  workspace: Workspace;
+
+  @Index
+  @ForeignKey(() => Branch)
+  @Column({ type: DataType.UUID, allowNull: false })
+  branchId: string;
+
+  @BelongsTo(() => Branch, { onDelete: 'CASCADE' })
+  branch: Branch;
+
+  @Index
   @ForeignKey(() => StudentProfile)
   @Column({ type: DataType.UUID, allowNull: false })
   studentProfileId: string;
 
-  @BelongsTo(() => StudentProfile)
+  @BelongsTo(() => StudentProfile, { onDelete: 'CASCADE' })
   studentProfile: StudentProfile;
 
   @Column({
@@ -51,6 +70,6 @@ export class Complaint extends Model<Complaint> {
   @Column({ type: DataType.UUID, allowNull: true })
   resolvedById: string;
 
-  @BelongsTo(() => User, 'resolvedById')
+  @BelongsTo(() => User, { foreignKey: 'resolvedById', onDelete: 'SET NULL' })
   resolvedBy: User;
 }

@@ -54,7 +54,7 @@ export class DashboardService {
       ],
       where: { status: 'UNPAID' },
     });
-    const duePayments = unpaidPayments.reduce((sum, p) => sum + p.amount, 0);
+    const duePayments = unpaidPayments.reduce((sum, p) => sum + Number(p.amount), 0);
 
     const today = new Date();
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -71,7 +71,7 @@ export class DashboardService {
         paidAt: { [Op.gte]: startOfMonth },
       },
     });
-    const monthlyRevenue = paidPaymentsThisMonth.reduce((sum, p) => sum + p.amount, 0);
+    const monthlyRevenue = paidPaymentsThisMonth.reduce((sum, p) => sum + Number(p.amount), 0);
 
     // Expiring subscriptions (next 7 days)
     const sevenDaysFromNow = new Date();
@@ -134,7 +134,7 @@ export class DashboardService {
     });
 
     const monthlyRecurringRevenue = activeSubscriptions.reduce((sum, sub) => {
-      return sum + (sub.saasPlan ? sub.saasPlan.price : 0);
+      return sum + (sub.saasPlan ? Number(sub.saasPlan.price) : 0);
     }, 0);
 
     const recentWorkspaces = await Workspace.findAll({

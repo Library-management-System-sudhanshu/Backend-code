@@ -1,4 +1,4 @@
-import { Table, Column, Model, DataType, ForeignKey, BelongsTo, HasOne } from 'sequelize-typescript';
+import { Table, Column, Model, DataType, ForeignKey, BelongsTo, HasOne, HasMany, Index } from 'sequelize-typescript';
 import { Workspace } from './workspace.model';
 import { Branch } from './branch.model';
 import { StudentProfile } from './student-profile.model';
@@ -11,7 +11,7 @@ export enum UserRole {
   STUDENT = 'STUDENT',
 }
 
-@Table({ tableName: 'users' })
+@Table({ tableName: 'users', paranoid: true })
 export class User extends Model<User> {
   @Column({
     type: DataType.UUID,
@@ -29,9 +29,6 @@ export class User extends Model<User> {
   @Column({ type: DataType.STRING, allowNull: true })
   googleId: string;
 
-  @Column({ type: DataType.STRING, allowNull: true })
-  rawPassword: string;
-
   @Column({ type: DataType.STRING, allowNull: false })
   name: string;
 
@@ -48,21 +45,20 @@ export class User extends Model<User> {
   @Column({ type: DataType.STRING, allowNull: true })
   avatar: string;
 
-  @Column({ type: DataType.TEXT, allowNull: true })
-  fcmToken: string;
-
+  @Index
   @ForeignKey(() => Workspace)
   @Column({ type: DataType.UUID, allowNull: true })
   workspaceId: string;
 
-  @BelongsTo(() => Workspace)
+  @BelongsTo(() => Workspace, { onDelete: 'CASCADE' })
   workspace: Workspace;
 
+  @Index
   @ForeignKey(() => Branch)
   @Column({ type: DataType.UUID, allowNull: true })
   branchId: string;
 
-  @BelongsTo(() => Branch)
+  @BelongsTo(() => Branch, { onDelete: 'SET NULL' })
   branch: Branch;
 
   @HasOne(() => StudentProfile)

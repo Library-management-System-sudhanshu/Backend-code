@@ -1,5 +1,6 @@
 import { Notice } from '../models/notice.model';
 import { User, UserRole } from '../models/user.model';
+import { UserDevice } from '../models/user-device.model';
 import { FirebaseService } from './firebase.service';
 import { NotFoundException } from '../middlewares/error.middleware';
 
@@ -17,17 +18,24 @@ export class NoticeService {
       createdById,
     } as any);
 
-    // 2. Fetch all student profiles in the workspace with non-empty FCM tokens
+    // 2. Fetch all student users in the workspace
     const studentUsers = await User.findAll({
       where: {
         workspaceId,
         role: UserRole.STUDENT,
       },
-      attributes: ['fcmToken'],
+      attributes: ['id'],
     });
 
-    const tokens = studentUsers
-      .map((u) => u.fcmToken)
+    const studentIds = studentUsers.map((u) => u.id);
+
+    // 3. Fetch FCM tokens from UserDevice table
+    const devices = studentIds.length > 0
+      ? await UserDevice.findAll({ where: { userId: studentIds } })
+      : [];
+
+    const tokens = devices
+      .map((d) => d.fcmToken)
       .filter((t): t is string => !!t && t.trim().length > 0);
 
     // 3. Broadcast notification
