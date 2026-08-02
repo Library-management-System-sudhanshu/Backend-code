@@ -42,7 +42,7 @@ async function startServer() {
       console.warn('[Database Pre-Sync Warning]', e);
     }
 
-    await sequelize.sync({ alter: true });
+    await sequelize.sync();
     console.log('[Database] Models synchronized successfully.');
 
     // Initialize Cron Jobs
