@@ -249,7 +249,6 @@ async function seed() {
     const user = await User.create({
       email,
       password: hashedStudentPassword,
-      rawPassword: 'Student@123',
       name,
       mobile,
       role: 'STUDENT',
@@ -259,6 +258,7 @@ async function seed() {
 
     const profile = await StudentProfile.create({
       userId: user.id,
+      workspaceId: workspace.id,
       branchId: branch.id,
       guardianName: `Guardian of ${name}`,
       guardianMobile: `9112233${String(i).padStart(3, '0')}`,
@@ -295,6 +295,7 @@ async function seed() {
 
     const plan = plans[i % plans.length];
     await StudentSubscription.create({
+      workspaceId: workspace.id,
       studentProfileId: profile.id,
       subscriptionPlanId: plan.id,
       startDate,
@@ -304,6 +305,8 @@ async function seed() {
 
     // Create Payment
     await Payment.create({
+      workspaceId: workspace.id,
+      branchId: branch.id,
       studentProfileId: profile.id,
       amount: plan.price,
       status: 'PAID',
@@ -316,6 +319,7 @@ async function seed() {
     const seat = seats[i - 1];
     const shift = shifts[i % shifts.length];
     await SeatAllocation.create({
+      workspaceId: workspace.id,
       studentProfileId: profile.id,
       seatId: seat.id,
       shiftId: shift.id,

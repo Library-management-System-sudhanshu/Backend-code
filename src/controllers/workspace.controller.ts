@@ -5,6 +5,15 @@ const workspaceService = new WorkspaceService();
 
 export class WorkspaceController {
   // Workspaces CRUD (Super Admin)
+  async createWorkspace(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await workspaceService.createWorkspace(req.body);
+      res.status(201).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getAllWorkspaces(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const result = await workspaceService.getAllWorkspaces();
@@ -138,6 +147,45 @@ export class WorkspaceController {
   async updateSettings(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const result = await workspaceService.updateSettings((req.params.workspaceId as string), req.body);
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // SaaS Subscriptions
+  async getSaaSSubscription(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await workspaceService.getSaaSSubscription((req.params.id as string));
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async startSaaSTrial(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { days } = req.body;
+      const result = await workspaceService.startSaaSTrial((req.params.id as string), days);
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async createSaaSPayment(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { saasPlanId } = req.body;
+      const result = await workspaceService.createSaaSPayment((req.params.id as string), saasPlanId);
+      res.status(201).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async verifySaaSPayment(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await workspaceService.verifySaaSPayment((req.params.id as string), req.body);
       res.status(200).json(result);
     } catch (error) {
       next(error);

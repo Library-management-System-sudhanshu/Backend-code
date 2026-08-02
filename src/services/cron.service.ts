@@ -4,6 +4,7 @@ import { Payment } from '../models/payment.model';
 import { StudentSubscription } from '../models/student-subscription.model';
 import { StudentProfile } from '../models/student-profile.model';
 import { User } from '../models/user.model';
+import { WorkspaceSubscription } from '../models/workspace-subscription.model';
 import { SeatAllocation } from '../models/seat-allocation.model';
 import { WhatsAppService } from './whatsapp.service';
 
@@ -13,12 +14,13 @@ export class CronService {
   static init() {
     // Run every day at 09:00 AM server time
     cron.schedule('0 9 * * *', async () => {
-      console.log('[CronService] Running daily automated WhatsApp reminders...');
+      console.log('[CronService] Running daily tasks...');
       try {
         await this.sendFeeReminders();
         await this.sendRenewalReminders();
+        await this.expireSaaSTrials();
       } catch (error) {
-        console.error('[CronService] Error running daily reminders:', error);
+        console.error('[CronService] Error running daily tasks:', error);
       }
     });
     console.log('[CronService] Daily WhatsApp reminders scheduled (09:00 AM).');
@@ -118,5 +120,28 @@ export class CronService {
       sentCount++;
     }
     console.log(`[CronService] Sent ${sentCount} renewal reminders.`);
+  }
+  static async expireSaaSTrials() {
+    const today = new Date();
+    
+    // Find all TRIAL subscriptions where trialEndDate is <= now
+    const expiredTrials = await WorkspaceSubscription.findAll({
+      where: {
+        status: 'TRIAL',
+        trialEndDate: {
+          [Op.lte]: today,
+        },
+      },
+    });
+
+    let count = 0;
+    for (const trial of expiredTrials) {
+      await trial.update({ status: 'EXPIRED' });
+      count++;
+    }
+    
+    if (count > 0) {
+      console.log(`[CronService] Expired ${count} SaaS trials.`);
+    }
   }
 }

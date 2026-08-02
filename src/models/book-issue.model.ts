@@ -1,7 +1,8 @@
-import { Table, Column, Model, DataType, ForeignKey, BelongsTo } from 'sequelize-typescript';
+import { Table, Column, Model, DataType, ForeignKey, BelongsTo, Index } from 'sequelize-typescript';
 import { Book } from './book.model';
 import { StudentProfile } from './student-profile.model';
 import { User } from './user.model';
+import { Workspace } from './workspace.model';
 
 export enum BookIssueStatus {
   REQUESTED = 'REQUESTED',
@@ -10,7 +11,7 @@ export enum BookIssueStatus {
   LOST = 'LOST',
 }
 
-@Table({ tableName: 'book_issues' })
+@Table({ tableName: 'book_issues', paranoid: true })
 export class BookIssue extends Model<BookIssue> {
   @Column({
     type: DataType.UUID,
@@ -19,25 +20,35 @@ export class BookIssue extends Model<BookIssue> {
   })
   declare id: string;
 
+  @Index
+  @ForeignKey(() => Workspace)
+  @Column({ type: DataType.UUID, allowNull: false })
+  workspaceId: string;
+
+  @BelongsTo(() => Workspace, { onDelete: 'CASCADE' })
+  workspace: Workspace;
+
+  @Index
   @ForeignKey(() => Book)
   @Column({ type: DataType.UUID, allowNull: false })
   bookId: string;
 
-  @BelongsTo(() => Book)
+  @BelongsTo(() => Book, { onDelete: 'CASCADE' })
   book: Book;
 
+  @Index
   @ForeignKey(() => StudentProfile)
   @Column({ type: DataType.UUID, allowNull: false })
   studentProfileId: string;
 
-  @BelongsTo(() => StudentProfile)
+  @BelongsTo(() => StudentProfile, { onDelete: 'CASCADE' })
   studentProfile: StudentProfile;
 
   @ForeignKey(() => User)
   @Column({ type: DataType.UUID, allowNull: true })
   issuedById: string;
 
-  @BelongsTo(() => User, 'issuedById')
+  @BelongsTo(() => User, { foreignKey: 'issuedById', onDelete: 'SET NULL' })
   issuedBy: User;
 
   @Column({ type: DataType.DATE, allowNull: false, defaultValue: DataType.NOW })
@@ -56,6 +67,6 @@ export class BookIssue extends Model<BookIssue> {
   })
   status: BookIssueStatus;
 
-  @Column({ type: DataType.DOUBLE, defaultValue: 0.0 })
+  @Column({ type: DataType.DECIMAL(10, 2), defaultValue: 0.0 })
   fineAmount: number;
 }

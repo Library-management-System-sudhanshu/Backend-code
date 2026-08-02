@@ -80,4 +80,14 @@ export class StudentController {
       next(error);
     }
   }
+
+  async clearDues(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { amount, method } = req.body;
+      const result = await studentService.clearDues(req.params.id as string, amount, method);
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
 }

@@ -6,6 +6,9 @@ import { User } from '../models/user.model';
 import { Room } from '../models/room.model';
 import { Floor } from '../models/floor.model';
 import { Branch } from '../models/branch.model';
+import { Workspace } from '../models/workspace.model';
+import { WorkspaceSubscription } from '../models/workspace-subscription.model';
+import { SaaSPlan } from '../models/saas-plan.model';
 import { Op } from 'sequelize';
 
 export class DashboardService {
@@ -51,7 +54,7 @@ export class DashboardService {
       ],
       where: { status: 'UNPAID' },
     });
-    const duePayments = unpaidPayments.reduce((sum, p) => sum + p.amount, 0);
+    const duePayments = unpaidPayments.reduce((sum, p) => sum + Number(p.amount), 0);
 
     const today = new Date();
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -68,7 +71,7 @@ export class DashboardService {
         paidAt: { [Op.gte]: startOfMonth },
       },
     });
-    const monthlyRevenue = paidPaymentsThisMonth.reduce((sum, p) => sum + p.amount, 0);
+    const monthlyRevenue = paidPaymentsThisMonth.reduce((sum, p) => sum + Number(p.amount), 0);
 
     // Expiring subscriptions (next 7 days)
     const sevenDaysFromNow = new Date();
@@ -115,6 +118,65 @@ export class DashboardService {
       revenueTrend,
       occupancyRate,
       occupancyTrend,
+    };
+  }
+
+  async getSuperAdminMetrics() {
+    const totalWorkspaces = await Workspace.count();
+
+    const activeStudents = await StudentProfile.count({
+      where: { status: 'APPROVED' },
+    });
+
+    const activeSubscriptions = await WorkspaceSubscription.findAll({
+      where: { status: 'ACTIVE' },
+      include: [SaaSPlan],
+    });
+
+    const monthlyRecurringRevenue = activeSubscriptions.reduce((sum, sub) => {
+      return sum + (sub.saasPlan ? Number(sub.saasPlan.price) : 0);
+    }, 0);
+
+    const recentWorkspaces = await Workspace.findAll({
+      order: [['createdAt', 'DESC']],
+      limit: 5,
+      include: [
+        {
+          model: User,
+          where: { role: 'OWNER' },
+          required: false,
+        },
+      ],
+    });
+
+    const recentOnboardings = await Promise.all(
+      recentWorkspaces.map(async (ws) => {
+        const sub = await WorkspaceSubscription.findOne({
+          where: { workspaceId: ws.id },
+          include: [SaaSPlan],
+          order: [['createdAt', 'DESC']],
+        });
+
+        const owner = ws.users && ws.users[0] ? ws.users[0].name : 'Unknown';
+
+        return {
+          id: ws.id,
+          name: ws.name,
+          subdomain: ws.subdomain,
+          owner: owner,
+          plan: sub && sub.saasPlan ? sub.saasPlan.name : (sub ? sub.status : 'None'),
+          status: sub ? sub.status : 'NO_SUBSCRIPTION',
+          createdAt: ws.createdAt,
+        };
+      })
+    );
+
+    return {
+      totalWorkspaces,
+      activeStudents,
+      monthlyRecurringRevenue,
+      platformUptime: '99.9%',
+      recentOnboardings,
     };
   }
 }

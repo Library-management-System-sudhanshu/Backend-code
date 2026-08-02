@@ -1,16 +1,30 @@
 import { Router } from 'express';
 import { SeatController } from '../controllers/seat.controller';
 import { authenticateJWT, requireRoles } from '../middlewares/auth.middleware';
+import { tenantIsolation } from '../middlewares/tenant.middleware';
 
 const router = Router();
 const controller = new SeatController();
 
 router.use(authenticateJWT);
+router.use(tenantIsolation);
 
 router.get(
   '/map/:branchId',
   requireRoles('OWNER', 'MANAGER', 'STAFF', 'STUDENT'),
   (req, res, next) => controller.getSeatMap(req, res, next)
+);
+
+router.get(
+  '/layout/:branchId',
+  requireRoles('OWNER', 'MANAGER', 'STAFF', 'STUDENT'),
+  (req, res, next) => controller.getBranchLayout(req, res, next)
+);
+
+router.get(
+  '/room/:roomId',
+  requireRoles('OWNER', 'MANAGER', 'STAFF', 'STUDENT'),
+  (req, res, next) => controller.getRoomSeats(req, res, next)
 );
 
 router.post(

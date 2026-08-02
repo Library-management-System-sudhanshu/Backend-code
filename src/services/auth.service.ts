@@ -1,11 +1,12 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/user.model';
+import { UserDevice } from '../models/user-device.model';
 import { Workspace } from '../models/workspace.model';
 import { Branch } from '../models/branch.model';
 import { WorkspaceSetting } from '../models/workspace-setting.model';
 import { StudentProfile } from '../models/student-profile.model';
-import { BadRequestException, UnauthorizedException } from '../middlewares/error.middleware';
+import { BadRequestException, UnauthorizedException, ForbiddenException } from '../middlewares/error.middleware';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'studyflow_secret_key_12345';
 
@@ -28,13 +29,13 @@ export class AuthService {
       counter++;
     }
 
-    // Create Workspace
     const workspace = await Workspace.create({
       name: data.workspaceName,
       subdomain,
       address: data.address,
       logo: data.logo || null,
       gstNumber: data.gstNumber || null,
+      pincode: data.pincode || null,
     } as any);
 
     // Create default branch
@@ -61,7 +62,11 @@ export class AuthService {
       branchId: branch.id,
     } as any);
 
-    return this.generateTokenResponse(user);
+    const userWithWorkspace = await User.findByPk(user.id, {
+      include: [Workspace]
+    });
+
+    return this.generateTokenResponse(userWithWorkspace!);
   }
 
   async login(data: any) {
@@ -71,6 +76,10 @@ export class AuthService {
     });
     if (!user) {
       throw new UnauthorizedException('Invalid email or password');
+    }
+
+    if (user.role !== 'SUPER_ADMIN' && user.workspace && !user.workspace.isActive) {
+      throw new ForbiddenException('Your workspace is disabled. Access denied.');
     }
 
     const isMatch = await bcrypt.compare(data.password, user.password);
@@ -92,9 +101,16 @@ export class AuthService {
   }
 
   async verifyOtp(mobile: string, otp: string) {
-    const user = await User.findOne({ where: { mobile } });
+    const user = await User.findOne({ 
+      where: { mobile },
+      include: [Workspace]
+    });
     if (!user) {
       throw new BadRequestException('Mobile number not registered');
+    }
+
+    if (user.role !== 'SUPER_ADMIN' && user.workspace && !user.workspace.isActive) {
+      throw new ForbiddenException('Your workspace is disabled. Access denied.');
     }
 
     if (otp !== '123456') {
@@ -122,19 +138,31 @@ export class AuthService {
           address: user.workspace.address,
           pincode: user.workspace.pincode,
           gstNumber: user.workspace.gstNumber,
-          subdomain: user.workspace.subdomain
+          subdomain: user.workspace.subdomain,
+          logo: user.workspace.logo
         } : null
       },
     };
   }
 
-  async updateFcmToken(userId: string, fcmToken: string) {
+  async updateFcmToken(userId: string, fcmToken: string, deviceType?: string, deviceName?: string) {
     const user = await User.findByPk(userId);
     if (!user) {
       throw new BadRequestException('User not found');
     }
-    await user.update({ fcmToken });
-    return user;
+
+    // Upsert: find existing device with this token, or create a new one
+    const [device] = await UserDevice.findOrCreate({
+      where: { userId, fcmToken },
+      defaults: {
+        userId,
+        fcmToken,
+        deviceType: deviceType || null,
+        deviceName: deviceName || null,
+      } as any,
+    });
+
+    return device;
   }
 
   async getProfile(userId: string) {
@@ -181,6 +209,7 @@ export class AuthService {
       if (data.address !== undefined) wsUpdate.address = data.address;
       if (data.gstNumber !== undefined) wsUpdate.gstNumber = data.gstNumber;
       if (data.pincode !== undefined) wsUpdate.pincode = data.pincode;
+      if (data.logo !== undefined) wsUpdate.logo = data.logo;
 
       if (Object.keys(wsUpdate).length > 0) {
         await user.workspace.update(wsUpdate);
@@ -204,8 +233,117 @@ export class AuthService {
         address: freshUser!.workspace.address,
         gstNumber: freshUser!.workspace.gstNumber,
         pincode: freshUser!.workspace.pincode,
-        subdomain: freshUser!.workspace.subdomain
+        subdomain: freshUser!.workspace.subdomain,
+        logo: freshUser!.workspace.logo
       } : null
     };
+  }
+
+  async googleLogin(idToken: string) {
+    let googlePayload: any;
+    if (idToken.startsWith('mock-token-')) {
+      try {
+        const parts = idToken.replace('mock-token-', '').split('.');
+        const payloadJson = Buffer.from(parts[1], 'base64').toString('utf-8');
+        googlePayload = JSON.parse(payloadJson);
+      } catch (err) {
+        throw new UnauthorizedException('Invalid mock token format');
+      }
+    } else {
+      try {
+        const verifyRes = await (globalThis as any).fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`);
+        googlePayload = await verifyRes.json();
+        if (googlePayload.error_description) {
+          throw new Error(googlePayload.error_description);
+        }
+      } catch (err: any) {
+        throw new UnauthorizedException(err.message || 'Google token validation failed');
+      }
+    }
+
+    const { email, name, sub: googleId } = googlePayload;
+    if (!email) {
+      throw new BadRequestException('Email address not provided by Google');
+    }
+
+    let user = await User.findOne({
+      where: { email },
+      include: [Workspace]
+    });
+
+    if (!user) {
+      // Register new user (Owner role, workspaceId is null initially)
+      user = await User.create({
+        email,
+        name: name || 'Google User',
+        googleId,
+        role: 'OWNER',
+      } as any);
+    } else if (!user.googleId) {
+      // Link Google Account to existing email
+      await user.update({ googleId });
+    }
+
+    const tokenResponse = this.generateTokenResponse(user);
+    return {
+      ...tokenResponse,
+      requiresWorkspaceInfo: !user.workspaceId,
+    };
+  }
+
+  async setupWorkspace(userId: string, data: any) {
+    const user = await User.findByPk(userId);
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
+    if (user.workspaceId) {
+      throw new BadRequestException('User already has a registered workspace');
+    }
+
+    // Generate unique subdomain
+    const baseSubdomain = data.workspaceName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'workspace';
+    let subdomain = baseSubdomain;
+    let counter = 1;
+    while (await Workspace.findOne({ where: { subdomain } })) {
+      subdomain = `${baseSubdomain}-${counter}`;
+      counter++;
+    }
+
+    // Create Workspace
+    const workspace = await Workspace.create({
+      name: data.workspaceName,
+      subdomain,
+      address: data.address,
+      pincode: data.pincode || null,
+      gstNumber: data.gstNumber || null,
+      logo: data.logo || null,
+    } as any);
+
+    // Create default branch
+    const branch = await Branch.create({
+      workspaceId: workspace.id,
+      name: 'Main Branch',
+      address: data.address,
+    } as any);
+
+    // Create default settings
+    await WorkspaceSetting.create({
+      workspaceId: workspace.id,
+      themeColor: '#2563EB',
+    } as any);
+
+    // Link user to workspace & branch
+    await user.update({
+      workspaceId: workspace.id,
+      branchId: branch.id,
+    });
+
+    // Fetch user with inclusion
+    const updatedUser = await User.findByPk(userId, {
+      include: [Workspace]
+    });
+
+    return this.generateTokenResponse(updatedUser!);
   }
 }

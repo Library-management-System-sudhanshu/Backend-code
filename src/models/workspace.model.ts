@@ -5,7 +5,7 @@ import { Shift } from './shift.model';
 import { SubscriptionPlan } from './subscription-plan.model';
 import { WorkspaceSetting } from './workspace-setting.model';
 
-@Table({ tableName: 'workspaces' })
+@Table({ tableName: 'workspaces', paranoid: true })
 export class Workspace extends Model<Workspace> {
   @Column({
     type: DataType.UUID,

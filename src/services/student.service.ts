@@ -1,7 +1,7 @@
 import bcrypt from 'bcrypt';
 import { Op } from 'sequelize';
 import { User } from '../models/user.model';
-import { StudentProfile } from '../models/student-profile.model';
+import { StudentProfile, StudentStatus } from '../models/student-profile.model';
 import { Branch } from '../models/branch.model';
 import { SeatAllocation } from '../models/seat-allocation.model';
 import { Seat } from '../models/seat.model';
@@ -68,7 +68,7 @@ export class StudentService {
         {
           model: User,
           where: userWhere,
-          attributes: ['id', 'name', 'email', 'mobile', 'avatar', 'rawPassword'],
+          attributes: ['id', 'name', 'email', 'mobile', 'avatar'],
         },
         {
           model: SeatAllocation,
@@ -101,7 +101,7 @@ export class StudentService {
   async getStudentById(id: string) {
     const student = await StudentProfile.findByPk(id, {
       include: [
-        { model: User, attributes: ['id', 'name', 'email', 'mobile', 'avatar', 'rawPassword'] },
+        { model: User, attributes: ['id', 'name', 'email', 'mobile', 'avatar'] },
         { model: Branch },
         { model: SeatAllocation, include: [{ all: true }] },
         { model: StudentSubscription, include: [{ all: true }] },
@@ -116,7 +116,7 @@ export class StudentService {
     const student = await StudentProfile.findOne({
       where: { userId },
       include: [
-        { model: User, attributes: ['id', 'name', 'email', 'mobile', 'avatar', 'rawPassword'] },
+        { model: User, attributes: ['id', 'name', 'email', 'mobile', 'avatar'] },
         { model: Branch },
         { model: SeatAllocation, include: [{ all: true }] },
         { model: StudentSubscription, include: [{ all: true }] },
@@ -127,9 +127,25 @@ export class StudentService {
   }
 
   async registerStudent(data: any, isSelfRegistration = false) {
+    if (data.mobile) {
+      const existingMobileUser = await User.findOne({ where: { mobile: data.mobile } });
+      if (existingMobileUser) {
+        throw new BadRequestException('Mobile number is already registered');
+      }
+    }
+
+    if (!data.email || !data.email.trim()) {
+      data.email = `${data.mobile || Date.now()}@studyflow.com`;
+    }
     const existingUser = await User.findOne({ where: { email: data.email } });
     if (existingUser) {
-      throw new BadRequestException('Email already in use');
+      if (existingUser.branchId && existingUser.branchId !== data.branchId) {
+        const otherBranch = await Branch.findByPk(existingUser.branchId);
+        const branchName = otherBranch ? otherBranch.name : 'another branch';
+        throw new BadRequestException(`Email is already registered in another.`);
+      } else {
+        throw new BadRequestException('Email already in use');
+      }
     }
 
     const hashedPassword = await bcrypt.hash(data.password || 'Student@123', 10);
@@ -138,7 +154,6 @@ export class StudentService {
     const user = await User.create({
       email: data.email,
       password: hashedPassword,
-      rawPassword: data.password || 'Student@123',
       name: data.name,
       mobile: data.mobile,
       role: 'STUDENT',
@@ -153,6 +168,7 @@ export class StudentService {
     // Create StudentProfile
     const profile = await StudentProfile.create({
       userId: user.id,
+      workspaceId: data.workspaceId,
       branchId: data.branchId,
       guardianName: data.guardianName,
       guardianMobile: data.guardianMobile,
@@ -161,16 +177,18 @@ export class StudentService {
       address: data.address || null,
       status: isSelfRegistration ? 'PENDING' : 'APPROVED',
       qrCodeUrl,
-      joiningDate: new Date(),
+      joiningDate: data.joiningDate ? new Date(data.joiningDate) : new Date(),
+      dueAmount: 0,
     } as any);
 
     // Create subscription and payment if plan is selected
     if (data.subscriptionPlanId) {
       const plan = await SubscriptionPlan.findByPk(data.subscriptionPlanId);
       if (plan) {
-        const startDate = new Date();
+        const startDate = data.joiningDate ? new Date(data.joiningDate) : new Date();
         const endDate = new Date(startDate.getTime() + plan.durationDays * 24 * 60 * 60 * 1000);
         await StudentSubscription.create({
+          workspaceId: data.workspaceId,
           studentProfileId: profile.id,
           subscriptionPlanId: data.subscriptionPlanId,
           startDate,
@@ -178,15 +196,23 @@ export class StudentService {
           status: 'ACTIVE',
         } as any);
 
+        const amountPaid = data.amountPaid !== undefined ? Number(data.amountPaid) : plan.price;
+        const dueAmount = Math.max(0, plan.price - amountPaid);
+        if (dueAmount > 0) {
+          await profile.update({ dueAmount });
+        }
+
         await Payment.create({
+          workspaceId: data.workspaceId,
+          branchId: data.branchId,
           studentProfileId: profile.id,
-          amount: plan.price,
+          amount: amountPaid,
           method: 'CASH',
-          status: 'PAID',
-          paidAt: new Date(),
+          status: dueAmount > 0 ? 'PARTIAL' : 'PAID',
+          paidAt: data.joiningDate ? new Date(data.joiningDate) : new Date(),
           transactionId: `CASH-REG-${Date.now()}`,
           invoiceUrl: `https://studyflow-receipts.s3.amazonaws.com/invoice_${Date.now()}.pdf`,
-          dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          dueDate: new Date((data.joiningDate ? new Date(data.joiningDate).getTime() : Date.now()) + 7 * 24 * 60 * 60 * 1000),
         } as any);
       }
     } else if (data.shiftId) {
@@ -210,9 +236,10 @@ export class StudentService {
           } as any);
         }
 
-        const startDate = new Date();
+        const startDate = data.joiningDate ? new Date(data.joiningDate) : new Date();
         const endDate = new Date(startDate.getTime() + plan.durationDays * 24 * 60 * 60 * 1000);
         await StudentSubscription.create({
+          workspaceId: data.workspaceId,
           studentProfileId: profile.id,
           subscriptionPlanId: plan.id,
           startDate,
@@ -220,11 +247,19 @@ export class StudentService {
           status: 'ACTIVE',
         } as any);
 
+        const amountPaid = data.amountPaid !== undefined ? Number(data.amountPaid) : shift.price;
+        const dueAmount = Math.max(0, shift.price - amountPaid);
+        if (dueAmount > 0) {
+          await profile.update({ dueAmount });
+        }
+
         await Payment.create({
+          workspaceId: data.workspaceId,
+          branchId: data.branchId,
           studentProfileId: profile.id,
-          amount: shift.price,
+          amount: amountPaid,
           method: 'CASH',
-          status: 'PAID',
+          status: dueAmount > 0 ? 'PARTIAL' : 'PAID',
           paidAt: new Date(),
           transactionId: `CASH-REG-SHIFT-${Date.now()}`,
           invoiceUrl: `https://studyflow-receipts.s3.amazonaws.com/invoice_${Date.now()}.pdf`,
@@ -242,10 +277,24 @@ export class StudentService {
 
     const user = profile.user;
 
+    if (data.mobile && data.mobile !== user.mobile) {
+      const existingMobileUser = await User.findOne({ where: { mobile: data.mobile } });
+      if (existingMobileUser) {
+        throw new BadRequestException('Mobile number is already registered');
+      }
+    }
+
     if (data.email && data.email !== user.email) {
       const existingUser = await User.findOne({ where: { email: data.email } });
       if (existingUser) {
-        throw new BadRequestException('Email already in use');
+        const targetBranchId = data.branchId || profile.branchId;
+        if (existingUser.branchId && existingUser.branchId !== targetBranchId) {
+          const otherBranch = await Branch.findByPk(existingUser.branchId);
+          const branchName = otherBranch ? otherBranch.name : 'another branch';
+          throw new BadRequestException(`Email is already registered in branch: ${branchName}`);
+        } else {
+          throw new BadRequestException('Email already in use');
+        }
       }
     }
 
@@ -261,7 +310,6 @@ export class StudentService {
 
     if (data.password) {
       userUpdates.password = await bcrypt.hash(data.password, 10);
-      userUpdates.rawPassword = data.password;
     }
 
     await user.update(userUpdates);
@@ -280,7 +328,7 @@ export class StudentService {
     return { user, profile };
   }
 
-  async updateStatus(id: string, status: string) {
+  async updateStatus(id: string, status: StudentStatus) {
     const profile = await StudentProfile.findByPk(id);
     if (!profile) throw new NotFoundException('Student profile not found');
 
@@ -296,5 +344,29 @@ export class StudentService {
     await profile.destroy();
     await User.destroy({ where: { id: userId } });
     return { success: true };
+  }
+
+  async clearDues(id: string, amount: number, method: string) {
+    const profile = await StudentProfile.findByPk(id);
+    if (!profile) throw new NotFoundException('Student profile not found');
+
+    if (amount <= 0) throw new BadRequestException('Amount must be greater than zero');
+    if (amount > (profile.dueAmount || 0)) throw new BadRequestException('Amount exceeds due balance');
+
+    await Payment.create({
+      workspaceId: profile.workspaceId,
+      branchId: profile.branchId,
+      studentProfileId: profile.id,
+      amount,
+      method,
+      status: 'PAID',
+      paidAt: new Date(),
+      transactionId: `DUES-CLR-${Date.now()}`,
+    } as any);
+
+    profile.dueAmount = (profile.dueAmount || 0) - amount;
+    await profile.save();
+
+    return profile;
   }
 }

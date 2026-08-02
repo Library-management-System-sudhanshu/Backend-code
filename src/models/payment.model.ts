@@ -1,5 +1,8 @@
-import { Table, Column, Model, DataType, ForeignKey, BelongsTo } from 'sequelize-typescript';
+import { Table, Column, Model, DataType, ForeignKey, BelongsTo, Index } from 'sequelize-typescript';
 import { StudentProfile } from './student-profile.model';
+import { SubscriptionPlan } from './subscription-plan.model';
+import { Workspace } from './workspace.model';
+import { Branch } from './branch.model';
 
 export enum PaymentMethod {
   CASH = 'CASH',
@@ -13,7 +16,14 @@ export enum PaymentStatus {
   REFUNDED = 'REFUNDED',
 }
 
-@Table({ tableName: 'payments' })
+@Table({
+  tableName: 'payments',
+  paranoid: true,
+  indexes: [
+    { fields: ['workspaceId', 'status'] },
+    { fields: ['studentProfileId', 'status'] },
+  ],
+})
 export class Payment extends Model<Payment> {
   @Column({
     type: DataType.UUID,
@@ -22,14 +32,31 @@ export class Payment extends Model<Payment> {
   })
   declare id: string;
 
+  @Index
+  @ForeignKey(() => Workspace)
+  @Column({ type: DataType.UUID, allowNull: false })
+  workspaceId: string;
+
+  @BelongsTo(() => Workspace, { onDelete: 'CASCADE' })
+  workspace: Workspace;
+
+  @Index
+  @ForeignKey(() => Branch)
+  @Column({ type: DataType.UUID, allowNull: false })
+  branchId: string;
+
+  @BelongsTo(() => Branch, { onDelete: 'CASCADE' })
+  branch: Branch;
+
+  @Index
   @ForeignKey(() => StudentProfile)
   @Column({ type: DataType.UUID, allowNull: false })
   studentProfileId: string;
 
-  @BelongsTo(() => StudentProfile)
+  @BelongsTo(() => StudentProfile, { onDelete: 'CASCADE' })
   studentProfile: StudentProfile;
 
-  @Column({ type: DataType.DOUBLE, allowNull: false })
+  @Column({ type: DataType.DECIMAL(10, 2), allowNull: false })
   amount: number;
 
   @Column({
@@ -48,8 +75,13 @@ export class Payment extends Model<Payment> {
   @Column({ type: DataType.STRING, allowNull: true })
   transactionId: string;
 
+  @Index
+  @ForeignKey(() => SubscriptionPlan)
   @Column({ type: DataType.UUID, allowNull: true })
   subscriptionPlanId: string;
+
+  @BelongsTo(() => SubscriptionPlan, { onDelete: 'SET NULL' })
+  subscriptionPlan: SubscriptionPlan;
 
   @Column({ type: DataType.STRING, allowNull: true })
   invoiceUrl: string;

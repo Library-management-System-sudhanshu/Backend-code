@@ -2,10 +2,13 @@ import { WhatsAppLog } from '../models/whatsapp-log.model';
 import { StudentProfile } from '../models/student-profile.model';
 import { User } from '../models/user.model';
 import { SeatAllocation } from '../models/seat-allocation.model';
+import { StudentSubscription } from '../models/student-subscription.model';
 
 export class WhatsAppService {
+  private static customTemplates: any[] = [];
+
   async getTemplates() {
-    return [
+    const defaultTemplates = [
       {
         id: 'fee_reminder',
         name: 'Fee Due Reminder',
@@ -27,6 +30,19 @@ export class WhatsAppService {
         text: 'Dear Students, {{message}}. Thank you for your cooperation.',
       },
     ];
+
+    return [...defaultTemplates, ...WhatsAppService.customTemplates];
+  }
+
+  async createTemplate(data: any) {
+    const id = `custom_${Date.now()}`;
+    const newTemplate = {
+      id,
+      name: data.name,
+      text: data.text,
+    };
+    WhatsAppService.customTemplates.push(newTemplate);
+    return newTemplate;
   }
 
   async sendMessage(workspaceId: string, studentProfileId: string, data: any) {
@@ -73,11 +89,14 @@ export class WhatsAppService {
   }
 
   async sendBroadcast(workspaceId: string, data: any) {
-    const { templateId, customVariables, filters } = data;
-    const { branchId, shiftId } = filters || {};
+    const { templateId, customVariables, filters, studentIds } = data;
+    const { branchId, shiftId, status } = filters || {};
 
     const profileWhere: any = { status: 'APPROVED' };
     if (branchId) profileWhere.branchId = branchId;
+    if (studentIds && studentIds.length > 0) {
+      profileWhere.id = studentIds;
+    }
 
     const includeList: any[] = [
       {
@@ -95,10 +114,50 @@ export class WhatsAppService {
       });
     }
 
-    const students = await StudentProfile.findAll({
+    // Include subscriptions and allocations to filter dynamically if status is set
+    includeList.push({
+      model: StudentSubscription,
+      required: false,
+    });
+    includeList.push({
+      model: SeatAllocation,
+      required: false,
+    });
+
+    let students = await StudentProfile.findAll({
       where: profileWhere,
       include: includeList,
     });
+
+    // Filter in-memory by status if provided
+    if (status && status !== 'ALL') {
+      students = students.filter((student) => {
+        if (status === 'ACTIVE') {
+          return student.subscriptions && student.subscriptions.some(s => s.status === 'ACTIVE');
+        }
+        if (status === 'EXPIRED') {
+          const hasActive = student.subscriptions && student.subscriptions.some(s => s.status === 'ACTIVE');
+          const hasExpired = student.subscriptions && student.subscriptions.some(s => s.status === 'EXPIRED');
+          return !hasActive && hasExpired;
+        }
+        if (status === 'EXPIRING_SOON') {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const sevenDaysLater = new Date(today);
+          sevenDaysLater.setDate(today.getDate() + 7);
+          return student.subscriptions && student.subscriptions.some(s => {
+            if (s.status !== 'ACTIVE') return false;
+            const endDate = new Date(s.endDate);
+            return endDate >= today && endDate <= sevenDaysLater;
+          });
+        }
+        if (status === 'NO_SEAT') {
+          const hasActiveSeat = student.allocations && student.allocations.some(a => a.isActive);
+          return !hasActiveSeat;
+        }
+        return true;
+      });
+    }
 
     const templates = await this.getTemplates();
     const template = templates.find((t) => t.id === templateId);

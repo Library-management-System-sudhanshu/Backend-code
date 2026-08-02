@@ -10,12 +10,14 @@ import crypto from 'crypto';
 
 export class PaymentService {
   async createPayment(data: any) {
-    const { studentProfileId, amount, method, subscriptionPlanId, shiftId } = data;
+    const { studentProfileId, amount, method, subscriptionPlanId, shiftId, totalAmount } = data;
 
     const student = await StudentProfile.findByPk(studentProfileId);
     if (!student) throw new NotFoundException('Student profile not found');
 
     let targetPlanId = subscriptionPlanId;
+    let finalTotalAmount = totalAmount !== undefined ? Number(totalAmount) : amount;
+
     if (shiftId) {
       const shift = await Shift.findByPk(shiftId);
       if (shift) {
@@ -25,12 +27,16 @@ export class PaymentService {
           const durationDays = durationMonths * 30;
           
           let planName = `${shift.name} Plan`;
+          let expectedPrice = shift.price || 0;
           if (durationMonths === 3) {
             planName = `${shift.name} 3-Month Plan`;
+            expectedPrice = shift.price3Months || (shift.price * 3);
           } else if (durationMonths === 6) {
             planName = `${shift.name} 6-Month Plan`;
+            expectedPrice = shift.price6Months || (shift.price * 6);
           } else if (durationMonths !== 1) {
             planName = `${shift.name} Plan - ${durationMonths} Months`;
+            expectedPrice = shift.price * durationMonths;
           }
 
           let plan = await SubscriptionPlan.findOne({
@@ -44,26 +50,42 @@ export class PaymentService {
             plan = await SubscriptionPlan.create({
               name: planName,
               workspaceId: user.workspaceId,
-              price: amount,
+              price: expectedPrice,
               durationDays,
               isActive: true,
             } as any);
           } else {
-            if (plan.price !== amount) {
-              await plan.update({ price: amount });
+            if (plan.price !== expectedPrice) {
+              await plan.update({ price: expectedPrice });
             }
           }
           targetPlanId = plan.id;
+          finalTotalAmount = expectedPrice;
         }
+      }
+    } else if (subscriptionPlanId) {
+      const plan = await SubscriptionPlan.findByPk(subscriptionPlanId);
+      if (plan) {
+        finalTotalAmount = plan.price;
       }
     }
 
+    const dueAmount = Math.max(0, finalTotalAmount - amount);
+    if (dueAmount > 0) {
+      student.dueAmount = Number(student.dueAmount || 0) + dueAmount;
+      await student.save();
+    }
+
     const payment = await Payment.create({
+      workspaceId: student.workspaceId,
+      branchId: student.branchId,
       studentProfileId,
       amount,
       method,
       subscriptionPlanId: targetPlanId || null,
-      status: method === 'CASH' ? PaymentStatus.PAID : PaymentStatus.UNPAID, // Cash payments are direct
+      status: method === 'CASH'
+        ? (dueAmount > 0 ? PaymentStatus.PARTIAL : PaymentStatus.PAID)
+        : PaymentStatus.UNPAID, // Cash payments are direct
       paidAt: method === 'CASH' ? new Date() : null,
       transactionId: method === 'CASH' ? `CASH-${Date.now()}` : null,
       invoiceUrl: `https://studyflow-receipts.s3.amazonaws.com/invoice_${Date.now()}.pdf`,
@@ -144,8 +166,16 @@ export class PaymentService {
       }
     }
 
+    let isPartial = false;
+    if (payment.subscriptionPlanId) {
+      const plan = await SubscriptionPlan.findByPk(payment.subscriptionPlanId);
+      if (plan && Number(payment.amount) < Number(plan.price)) {
+        isPartial = true;
+      }
+    }
+
     await payment.update({
-      status: PaymentStatus.PAID,
+      status: isPartial ? PaymentStatus.PARTIAL : PaymentStatus.PAID,
       transactionId,
       paidAt: new Date(),
       receiptUrl: `https://studyflow-receipts.s3.amazonaws.com/receipt_${payment.id}.pdf`,
@@ -162,8 +192,16 @@ export class PaymentService {
     const payment = await Payment.findByPk(paymentId);
     if (!payment) throw new NotFoundException('Payment record not found');
 
+    let isPartial = false;
+    if (payment.subscriptionPlanId) {
+      const plan = await SubscriptionPlan.findByPk(payment.subscriptionPlanId);
+      if (plan && Number(payment.amount) < Number(plan.price)) {
+        isPartial = true;
+      }
+    }
+
     await payment.update({
-      status: PaymentStatus.PAID,
+      status: isPartial ? PaymentStatus.PARTIAL : PaymentStatus.PAID,
       method,
       transactionId: `${method}-${Date.now()}`,
       paidAt: new Date(),
@@ -176,6 +214,9 @@ export class PaymentService {
   private async activateSubscription(studentProfileId: string, planId: string) {
     const plan = await SubscriptionPlan.findByPk(planId);
     if (!plan) return;
+
+    const student = await StudentProfile.findByPk(studentProfileId);
+    if (!student) return;
 
     // Check if there is an active subscription
     const activeSub = await StudentSubscription.findOne({
@@ -191,6 +232,7 @@ export class PaymentService {
     const endDate = new Date(startDate.getTime() + plan.durationDays * 24 * 60 * 60 * 1000);
 
     await StudentSubscription.create({
+      workspaceId: student.workspaceId,
       studentProfileId,
       subscriptionPlanId: planId,
       startDate,
@@ -209,11 +251,31 @@ export class PaymentService {
 
     return Payment.findAll({
       where: whereClause,
+      attributes: [
+        'id',
+        'studentProfileId',
+        'amount',
+        'status',
+        'method',
+        'transactionId',
+        'invoiceUrl',
+        'receiptUrl',
+        'dueDate',
+        'paidAt',
+        'createdAt'
+      ],
       include: [
         {
           model: StudentProfile,
           required: true,
-          include: [{ model: User, where: { workspaceId } }],
+          attributes: ['id'],
+          include: [
+            {
+              model: User,
+              where: { workspaceId },
+              attributes: ['id', 'name', 'email']
+            }
+          ],
         },
       ],
       order: [['createdAt', 'DESC']],
@@ -233,16 +295,35 @@ export class PaymentService {
         status: PaymentStatus.PAID,
         paidAt: { [Op.gte]: startDate },
       },
+      attributes: [
+        'id',
+        'amount',
+        'status',
+        'method',
+        'transactionId',
+        'invoiceUrl',
+        'receiptUrl',
+        'dueDate',
+        'paidAt',
+        'createdAt'
+      ],
       include: [
         {
           model: StudentProfile,
           required: true,
-          include: [{ model: User, where: { workspaceId } }],
+          attributes: ['id'],
+          include: [
+            {
+              model: User,
+              where: { workspaceId },
+              attributes: ['id', 'name', 'email']
+            }
+          ],
         },
       ],
     });
 
-    const totalCollected = payments.reduce((sum, p) => sum + p.amount, 0);
+    const totalCollected = payments.reduce((sum, p) => sum + parseFloat(String(p.amount)), 0);
 
     return {
       range,

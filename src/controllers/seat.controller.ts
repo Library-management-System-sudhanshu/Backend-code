@@ -15,6 +15,24 @@ export class SeatController {
     }
   }
 
+  async getBranchLayout(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await seatService.getBranchLayout((req.params.branchId as string));
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getRoomSeats(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await seatService.getRoomSeats((req.params.roomId as string));
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async addFloor(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const result = await seatService.addFloor(req.body.branchId, req.body.name);

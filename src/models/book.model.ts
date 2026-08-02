@@ -1,8 +1,8 @@
-import { Table, Column, Model, DataType, ForeignKey, BelongsTo, HasMany } from 'sequelize-typescript';
+import { Table, Column, Model, DataType, ForeignKey, BelongsTo, HasMany, Index } from 'sequelize-typescript';
 import { Workspace } from './workspace.model';
 import { BookIssue } from './book-issue.model';
 
-@Table({ tableName: 'books' })
+@Table({ tableName: 'books', paranoid: true })
 export class Book extends Model<Book> {
   @Column({
     type: DataType.UUID,
@@ -11,11 +11,12 @@ export class Book extends Model<Book> {
   })
   declare id: string;
 
+  @Index
   @ForeignKey(() => Workspace)
   @Column({ type: DataType.UUID, allowNull: false })
   workspaceId: string;
 
-  @BelongsTo(() => Workspace)
+  @BelongsTo(() => Workspace, { onDelete: 'CASCADE' })
   workspace: Workspace;
 
   @Column({ type: DataType.STRING, allowNull: false })

@@ -13,4 +13,13 @@ export class DashboardController {
       next(error);
     }
   }
+
+  async getSuperAdminMetrics(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await dashboardService.getSuperAdminMetrics();
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
 }

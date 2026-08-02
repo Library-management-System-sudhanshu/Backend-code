@@ -10,6 +10,7 @@ import { NotFoundException, BadRequestException } from '../middlewares/error.mid
 
 export class SeatService {
   async getSeatMap(branchId: string) {
+    await this.checkExpirations();
     return Floor.findAll({
       where: { branchId },
       include: [
@@ -31,6 +32,36 @@ export class SeatService {
         },
       ],
       order: [['name', 'ASC']],
+    });
+  }
+
+  async getBranchLayout(branchId: string) {
+    return Floor.findAll({
+      where: { branchId },
+      include: [
+        {
+          model: Room,
+          attributes: ['id', 'name', 'floorId'],
+        },
+      ],
+      order: [
+        ['name', 'ASC'],
+      ],
+    });
+  }
+
+  async getRoomSeats(roomId: string) {
+    return Seat.findAll({
+      where: { roomId },
+      include: [
+        {
+          model: SeatAllocation,
+          required: false,
+          where: { isActive: true },
+          include: [{ model: StudentProfile, include: [{ all: true }] }, { model: Shift }],
+        },
+      ],
+      order: [['number', 'ASC']],
     });
   }
 
@@ -124,6 +155,7 @@ export class SeatService {
   }
 
   async allocateSeat(data: any) {
+    await this.checkExpirations();
     const { studentProfileId, seatId, shiftId, startDate, endDate } = data;
 
     const student = await StudentProfile.findByPk(studentProfileId);
@@ -150,14 +182,33 @@ export class SeatService {
       throw new BadRequestException('Seat is already occupied in this shift');
     }
 
+    // Find student's current active allocations to update their old seats' status
+    const currentStudentAllocations = await SeatAllocation.findAll({
+      where: { studentProfileId, isActive: true }
+    });
+
     // Deactivate current active allocations for this student if any
     await SeatAllocation.update(
       { isActive: false },
       { where: { studentProfileId, isActive: true } }
     );
 
+    // Update old seats status if they no longer have any active allocations
+    for (const oldAlloc of currentStudentAllocations) {
+      const oldSeat = await Seat.findByPk(oldAlloc.seatId);
+      if (oldSeat) {
+        const remainingActiveCount = await SeatAllocation.count({
+          where: { seatId: oldAlloc.seatId, isActive: true }
+        });
+        if (remainingActiveCount === 0) {
+          await oldSeat.update({ status: SeatStatus.AVAILABLE });
+        }
+      }
+    }
+
     // Create allocation
     const allocation = await SeatAllocation.create({
+      workspaceId: student.workspaceId,
       studentProfileId,
       seatId,
       shiftId,
@@ -173,6 +224,7 @@ export class SeatService {
   }
 
   async transferSeat(allocationId: string, targetSeatId: string) {
+    await this.checkExpirations();
     const allocation = await SeatAllocation.findByPk(allocationId);
     if (!allocation) throw new NotFoundException('Active allocation not found');
 
@@ -208,6 +260,7 @@ export class SeatService {
 
     // Create new allocation
     const newAllocation = await SeatAllocation.create({
+      workspaceId: allocation.workspaceId,
       studentProfileId: allocation.studentProfileId,
       seatId: targetSeatId,
       shiftId: allocation.shiftId,
@@ -270,6 +323,17 @@ export class SeatService {
         if (remainingActiveCount === 0) {
           await seat.update({ status: SeatStatus.AVAILABLE });
         }
+      }
+    }
+
+    // Auto-correct any seats that are marked OCCUPIED but have no active allocations
+    const occupiedSeats = await Seat.findAll({ where: { status: SeatStatus.OCCUPIED } });
+    for (const seat of occupiedSeats) {
+      const activeCount = await SeatAllocation.count({
+        where: { seatId: seat.id, isActive: true }
+      });
+      if (activeCount === 0) {
+        await seat.update({ status: SeatStatus.AVAILABLE });
       }
     }
 
