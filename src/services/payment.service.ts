@@ -253,6 +253,7 @@ export class PaymentService {
       where: whereClause,
       attributes: [
         'id',
+        'studentProfileId',
         'amount',
         'status',
         'method',

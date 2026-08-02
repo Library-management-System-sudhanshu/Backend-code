@@ -6,6 +6,11 @@ import { WorkspaceSetting } from '../models/workspace-setting.model';
 import { WorkspaceSubscription } from '../models/workspace-subscription.model';
 import { SaaSPlan } from '../models/saas-plan.model';
 import { User } from '../models/user.model';
+import { Room } from '../models/room.model';
+import { Seat } from '../models/seat.model';
+import { StudentProfile } from '../models/student-profile.model';
+import { Payment } from '../models/payment.model';
+import { Floor } from '../models/floor.model';
 import { NotFoundException, BadRequestException } from '../middlewares/error.middleware';
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
@@ -106,9 +111,82 @@ export class WorkspaceService {
   }
 
   async getWorkspaceById(id: string) {
-    const ws = await Workspace.findByPk(id, { include: [Branch, WorkspaceSetting] });
+    const ws = await Workspace.findByPk(id, {
+      include: [
+        Branch,
+        WorkspaceSetting,
+        {
+          model: User,
+          where: { role: 'OWNER' },
+          required: false
+        }
+      ]
+    });
     if (!ws) throw new NotFoundException('Workspace not found');
-    return ws;
+
+    const sub = await WorkspaceSubscription.findOne({
+      where: { workspaceId: ws.id },
+      include: [SaaSPlan],
+      order: [['createdAt', 'DESC']]
+    });
+
+    const studentCount = await StudentProfile.count({ where: { workspaceId: id } });
+    
+    const branches = await Branch.findAll({ where: { workspaceId: id } });
+    const branchIds = branches.map(b => b.id);
+    
+    let roomCount = 0;
+    let seatCount = 0;
+    let roomList: any[] = [];
+
+    if (branchIds.length > 0) {
+      const floors = await Floor.findAll({ where: { branchId: branchIds } });
+      const floorIds = floors.map(f => f.id);
+      
+      if (floorIds.length > 0) {
+        roomCount = await Room.count({ where: { floorId: floorIds } });
+        roomList = await Room.findAll({
+          where: { floorId: floorIds },
+          include: [
+            {
+              model: Floor,
+              include: [Branch]
+            },
+            Seat
+          ]
+        });
+        const roomIds = roomList.map(r => r.id);
+        
+        if (roomIds.length > 0) {
+          seatCount = await Seat.count({ where: { roomId: roomIds } });
+        }
+      }
+    }
+
+    const totalRevenue = await Payment.sum('amount', { where: { workspaceId: id, status: 'PAID' } }) || 0;
+    const payments = await Payment.findAll({
+      where: { workspaceId: id },
+      include: [
+        {
+          model: StudentProfile,
+          include: [User]
+        }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
+
+    return {
+      ...ws.toJSON(),
+      subscription: sub,
+      metrics: {
+        studentCount,
+        roomCount,
+        seatCount,
+        totalRevenue
+      },
+      rooms: roomList,
+      payments
+    };
   }
 
   async updateWorkspace(id: string, data: any) {

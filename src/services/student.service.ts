@@ -177,7 +177,7 @@ export class StudentService {
       address: data.address || null,
       status: isSelfRegistration ? 'PENDING' : 'APPROVED',
       qrCodeUrl,
-      joiningDate: new Date(),
+      joiningDate: data.joiningDate ? new Date(data.joiningDate) : new Date(),
       dueAmount: 0,
     } as any);
 
@@ -185,7 +185,7 @@ export class StudentService {
     if (data.subscriptionPlanId) {
       const plan = await SubscriptionPlan.findByPk(data.subscriptionPlanId);
       if (plan) {
-        const startDate = new Date();
+        const startDate = data.joiningDate ? new Date(data.joiningDate) : new Date();
         const endDate = new Date(startDate.getTime() + plan.durationDays * 24 * 60 * 60 * 1000);
         await StudentSubscription.create({
           workspaceId: data.workspaceId,
@@ -209,10 +209,10 @@ export class StudentService {
           amount: amountPaid,
           method: 'CASH',
           status: dueAmount > 0 ? 'PARTIAL' : 'PAID',
-          paidAt: new Date(),
+          paidAt: data.joiningDate ? new Date(data.joiningDate) : new Date(),
           transactionId: `CASH-REG-${Date.now()}`,
           invoiceUrl: `https://studyflow-receipts.s3.amazonaws.com/invoice_${Date.now()}.pdf`,
-          dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          dueDate: new Date((data.joiningDate ? new Date(data.joiningDate).getTime() : Date.now()) + 7 * 24 * 60 * 60 * 1000),
         } as any);
       }
     } else if (data.shiftId) {
@@ -236,7 +236,7 @@ export class StudentService {
           } as any);
         }
 
-        const startDate = new Date();
+        const startDate = data.joiningDate ? new Date(data.joiningDate) : new Date();
         const endDate = new Date(startDate.getTime() + plan.durationDays * 24 * 60 * 60 * 1000);
         await StudentSubscription.create({
           workspaceId: data.workspaceId,
