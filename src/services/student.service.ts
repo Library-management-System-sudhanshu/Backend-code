@@ -55,9 +55,11 @@ export class StudentService {
         } else if (filterExpiration === 'EXPIRED') {
           allocationWhere.endDate = { [Op.lt]: today };
         } else if (filterExpiration === 'EXPIRING_SOON') {
-          const sevenDaysLater = new Date(today);
-          sevenDaysLater.setDate(today.getDate() + 7);
-          allocationWhere.endDate = { [Op.between]: [today, sevenDaysLater] };
+          const daysNum = query.days ? parseInt(query.days as string, 10) : 7;
+          const targetDate = new Date(today);
+          targetDate.setDate(today.getDate() + (Number.isInteger(daysNum) && daysNum > 0 ? daysNum : 7));
+          targetDate.setHours(23, 59, 59, 999);
+          allocationWhere.endDate = { [Op.between]: [today, targetDate] };
         }
       }
     }

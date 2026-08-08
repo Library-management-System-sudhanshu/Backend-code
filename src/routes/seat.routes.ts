@@ -45,6 +45,12 @@ router.post(
   (req, res, next) => controller.addSeat(req, res, next)
 );
 
+router.post(
+  '/seats/bulk',
+  requireRoles('OWNER', 'MANAGER'),
+  (req, res, next) => controller.addBulkSeats(req, res, next)
+);
+
 router.put(
   '/layout',
   requireRoles('OWNER', 'MANAGER'),

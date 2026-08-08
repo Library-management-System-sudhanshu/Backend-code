@@ -1,5 +1,6 @@
 import { StudentProfile } from '../models/student-profile.model';
 import { Seat } from '../models/seat.model';
+import { SeatAllocation } from '../models/seat-allocation.model';
 import { Payment } from '../models/payment.model';
 import { StudentSubscription } from '../models/student-subscription.model';
 import { User } from '../models/user.model';
@@ -12,7 +13,7 @@ import { SaaSPlan } from '../models/saas-plan.model';
 import { Op } from 'sequelize';
 
 export class DashboardService {
-  async getMetrics(workspaceId: string) {
+  async getMetrics(workspaceId: string, daysExpiring: number = 7) {
     // Active students
     const activeStudents = await StudentProfile.count({
       include: [{ model: User, where: { workspaceId, role: 'STUDENT' } }],
@@ -73,24 +74,45 @@ export class DashboardService {
     });
     const monthlyRevenue = paidPaymentsThisMonth.reduce((sum, p) => sum + Number(p.amount), 0);
 
-    // Expiring subscriptions (next 7 days)
-    const sevenDaysFromNow = new Date();
-    sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
-    const expiringSubscriptions = await StudentSubscription.count({
+    // Expiring plans (next N days)
+    const validDays = Number.isInteger(daysExpiring) && daysExpiring > 0 ? daysExpiring : 7;
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const endOfTargetDate = new Date(startOfToday);
+    endOfTargetDate.setDate(startOfToday.getDate() + validDays);
+    endOfTargetDate.setHours(23, 59, 59, 999);
+
+    const userWhere: any = {};
+    if (workspaceId) {
+      userWhere.workspaceId = workspaceId;
+    }
+
+    const expiringAllocations = await SeatAllocation.findAll({
+      attributes: ['studentProfileId'],
       include: [
         {
           model: StudentProfile,
           required: true,
-          include: [{ model: User, where: { workspaceId } }],
+          include: [{ model: User, where: userWhere }],
         },
       ],
       where: {
-        status: 'ACTIVE',
+        isActive: true,
         endDate: {
-          [Op.between]: [today, sevenDaysFromNow],
+          [Op.between]: [startOfToday, endOfTargetDate],
         },
       },
     });
+
+// Compute unique students with expiring seat allocations
+const uniqueExpiringStudentIds = new Set<string>(
+  expiringAllocations.map((a) => a.studentProfileId)
+);
+const expiringSubscriptions = uniqueExpiringStudentIds.size; // metric name unchanged
+
+// Duplicate allocation query removed – using earlier expiringAllocations
+
 
     // Mock charts data
     const revenueTrend = [

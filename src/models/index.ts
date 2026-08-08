@@ -20,3 +20,4 @@ export * from './whatsapp-log.model';
 export * from './notice.model';
 export * from './saas-plan.model';
 export * from './workspace-subscription.model';
+export * from './broadcast-log.model';

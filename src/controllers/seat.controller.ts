@@ -60,6 +60,16 @@ export class SeatController {
     }
   }
 
+  async addBulkSeats(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const numbers = Array.isArray(req.body.numbers) ? req.body.numbers : [req.body.number];
+      const result = await seatService.addBulkSeats(req.body.roomId, numbers);
+      res.status(201).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async deleteRoom(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const result = await seatService.deleteRoom((req.params.id as string));

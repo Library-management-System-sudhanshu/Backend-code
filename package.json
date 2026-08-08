@@ -39,6 +39,7 @@
     "pg": "^8.22.0",
     "pg-hstore": "^2.3.4",
     "reflect-metadata": "^0.2.2",
+    "resend": "^6.18.1",
     "rxjs": "^7.8.1",
     "sequelize": "^6.37.8",
     "sequelize-typescript": "^2.1.6"

@@ -87,6 +87,44 @@ export class SeatService {
     return Seat.create({ roomId, number: trimmedNumber, status: SeatStatus.AVAILABLE } as any);
   }
 
+  async addBulkSeats(roomId: string, numbers: string[]) {
+    const room = await Room.findByPk(roomId);
+    if (!room) throw new NotFoundException('Room not found');
+
+    const cleanNumbers = numbers.map(n => n.toString().trim()).filter(Boolean);
+    if (cleanNumbers.length === 0) {
+      throw new BadRequestException('No seat numbers provided');
+    }
+
+    // Find existing seats in this room to prevent duplicate keys
+    const existingSeats = await Seat.findAll({
+      where: {
+        roomId,
+        number: cleanNumbers
+      },
+      attributes: ['number']
+    });
+    const existingSet = new Set(existingSeats.map(s => s.number));
+    const newNumbers = cleanNumbers.filter(n => !existingSet.has(n));
+
+    if (newNumbers.length === 0) {
+      throw new BadRequestException('All provided seat numbers already exist in this room.');
+    }
+
+    const seatRecords = newNumbers.map(num => ({
+      roomId,
+      number: num,
+      status: SeatStatus.AVAILABLE
+    }));
+
+    const createdSeats = await Seat.bulkCreate(seatRecords as any);
+    return {
+      message: `${createdSeats.length} seats created successfully`,
+      count: createdSeats.length,
+      seats: createdSeats
+    };
+  }
+
   async updateSeatStatus(seatId: string, status: SeatStatus) {
     const seat = await Seat.findByPk(seatId);
     if (!seat) throw new NotFoundException('Seat not found');

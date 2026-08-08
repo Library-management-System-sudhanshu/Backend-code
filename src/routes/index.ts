@@ -12,6 +12,8 @@ import dashboardRoutes from './dashboard.routes';
 import noticeRoutes from './notice.routes';
 import safetyRoutes from './safety.routes';
 import saasPlanRoutes from './saas-plan.routes';
+import smsRoutes from './sms.routes';
+import emailRoutes from './email.routes';
 
 const router = Router();
 
@@ -28,6 +30,8 @@ router.use('/dashboard', dashboardRoutes);
 router.use('/notices', noticeRoutes);
 router.use('/safety', safetyRoutes);
 router.use('/saas-plans', saasPlanRoutes);
+router.use('/sms', smsRoutes);
+router.use('/email', emailRoutes);
 
 import fs from 'fs';
 import path from 'path';
