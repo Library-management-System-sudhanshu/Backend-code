@@ -22,4 +22,29 @@ router.get(
   (req, res, next) => controller.getLogs(req, res, next)
 );
 
+router.get(
+  '/stats',
+  requireRoles('OWNER', 'MANAGER', 'STAFF'),
+  tenantIsolation,
+  (req, res, next) => controller.getStats(req, res, next)
+);
+
+router.get(
+  '/domain',
+  requireRoles('OWNER', 'MANAGER'),
+  (req, res, next) => controller.getDomainInfo(req, res, next)
+);
+
+router.post(
+  '/domain/verify',
+  requireRoles('OWNER', 'MANAGER'),
+  (req, res, next) => controller.verifyDomain(req, res, next)
+);
+
+router.post(
+  '/domain/update',
+  requireRoles('OWNER', 'MANAGER'),
+  (req, res, next) => controller.updateDomain(req, res, next)
+);
+
 export default router;

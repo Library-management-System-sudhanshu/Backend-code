@@ -40,13 +40,20 @@ export class Shift extends Model<Shift> {
   @Column({ type: DataType.DECIMAL(10, 2), defaultValue: 0 })
   price: number;
 
-  // TODO: Normalize into a ShiftPricing table to avoid repeating groups (1NF violation)
+  @Column({ type: DataType.DECIMAL(10, 2), allowNull: true })
+  price7Days: number | null;
+
+  @Column({ type: DataType.DECIMAL(10, 2), allowNull: true })
+  price15Days: number | null;
+
   @Column({ type: DataType.DECIMAL(10, 2), allowNull: true })
   price3Months: number | null;
 
-  // TODO: Normalize into a ShiftPricing table to avoid repeating groups (1NF violation)
   @Column({ type: DataType.DECIMAL(10, 2), allowNull: true })
   price6Months: number | null;
+
+  @Column({ type: DataType.JSON, allowNull: true })
+  customPricing: { label: string; price: number; durationType?: string; durationValue?: number }[] | null;
 
   @HasMany(() => SeatAllocation)
   allocations: SeatAllocation[];

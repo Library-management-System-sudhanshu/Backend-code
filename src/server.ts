@@ -42,6 +42,16 @@ async function startServer() {
     //   console.warn('[Database Pre-Sync Warning]', e);
     // }
 
+    try {
+      await sequelize.query(`
+        ALTER TABLE "shifts" ADD COLUMN IF NOT EXISTS "price7Days" DECIMAL(10, 2);
+        ALTER TABLE "shifts" ADD COLUMN IF NOT EXISTS "price15Days" DECIMAL(10, 2);
+        ALTER TABLE "shifts" ADD COLUMN IF NOT EXISTS "customPricing" JSONB;
+      `);
+    } catch (e) {
+      console.warn('[Database Migration Warning]', e);
+    }
+
     await sequelize.sync();
     console.log('[Database] Models synchronized successfully.');
 

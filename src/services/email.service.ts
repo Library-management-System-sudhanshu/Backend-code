@@ -1,9 +1,11 @@
 import { Resend } from 'resend';
+import { Op } from 'sequelize';
 import { BroadcastLog } from '../models/broadcast-log.model';
 import { StudentProfile } from '../models/student-profile.model';
 import { User } from '../models/user.model';
 import { SeatAllocation } from '../models/seat-allocation.model';
 import { StudentSubscription } from '../models/student-subscription.model';
+import { BadRequestException } from '../middlewares/error.middleware';
 
 export class EmailService {
   private resend: Resend | null = null;
@@ -85,7 +87,11 @@ export class EmailService {
       });
     }
 
-    const senderEmail = fromEmail || 'onboarding@resend.dev';
+    if (!students || students.length === 0) {
+      throw new BadRequestException('No approved students found matching the selected target filters.');
+    }
+
+    const senderEmail = fromEmail || 'StudyFlow Notifications <no-reply@trishulindustries.online>';
 
     const logs: any[] = [];
     for (const student of students) {
@@ -114,9 +120,16 @@ export class EmailService {
       logs.push(log);
     }
 
+    const sentCount = logs.filter((l) => l.status === 'SENT').length;
+    const failedCount = logs.filter((l) => l.status === 'FAILED').length;
+
+    if (sentCount === 0 && failedCount > 0) {
+      throw new BadRequestException(`Failed to send email broadcast. All ${failedCount} email(s) failed via Resend API.`);
+    }
+
     return {
-      sentCount: logs.filter((l) => l.status === 'SENT').length,
-      failedCount: logs.filter((l) => l.status === 'FAILED').length,
+      sentCount,
+      failedCount,
       logs,
     };
   }
@@ -126,6 +139,104 @@ export class EmailService {
       where: { workspaceId, channel: 'EMAIL' },
       order: [['sentAt', 'DESC']],
     });
+  }
+
+  async getStats(workspaceId: string) {
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+
+    const whereBase: any = { channel: 'EMAIL', status: 'SENT' };
+    if (workspaceId) {
+      whereBase.workspaceId = workspaceId;
+    }
+
+    const dailyCount = await BroadcastLog.count({
+      where: {
+        ...whereBase,
+        sentAt: { [Op.gte]: startOfToday },
+      },
+    });
+
+    const monthlyCount = await BroadcastLog.count({
+      where: {
+        ...whereBase,
+        sentAt: { [Op.gte]: startOfMonth },
+      },
+    });
+
+    const totalCount = await BroadcastLog.count({
+      where: whereBase,
+    });
+
+    const dailyLimit = 100;
+    const monthlyLimit = 3000;
+
+    return {
+      dailyCount,
+      dailyLimit,
+      dailyRemaining: Math.max(0, dailyLimit - dailyCount),
+      monthlyCount,
+      monthlyLimit,
+      monthlyRemaining: Math.max(0, monthlyLimit - monthlyCount),
+      totalCount,
+    };
+  }
+
+  // Resend Domain API Methods for trishulindustries.online
+  async getDomainInfo(domainName: string = 'trishulindustries.online') {
+    if (!this.resend) {
+      return { success: false, message: 'Resend API key is not configured.' };
+    }
+
+    try {
+      const listRes = await this.resend.domains.list();
+      const existing = listRes.data?.data?.find((d: any) => d.name === domainName);
+
+      if (existing) {
+        const detail = await this.resend.domains.get(existing.id);
+        return { success: true, domain: detail.data || existing };
+      }
+
+      // Create domain if not exists
+      const created = await this.resend.domains.create({ name: domainName });
+      return { success: true, domain: created.data, created: true };
+    } catch (error: any) {
+      console.error('[Email Service] Domain info error:', error);
+      return { success: false, error: error.message || error };
+    }
+  }
+
+  async verifyDomain(domainId: string) {
+    if (!this.resend) {
+      return { success: false, message: 'Resend API key is not configured.' };
+    }
+
+    try {
+      const result = await this.resend.domains.verify(domainId);
+      return { success: true, result: result.data || result };
+    } catch (error: any) {
+      console.error('[Email Service] Domain verify error:', error);
+      return { success: false, error: error.message || error };
+    }
+  }
+
+  async updateDomain(domainId: string, openTracking = false, clickTracking = true) {
+    if (!this.resend) {
+      return { success: false, message: 'Resend API key is not configured.' };
+    }
+
+    try {
+      const result = await this.resend.domains.update({
+        id: domainId,
+        openTracking,
+        clickTracking,
+      });
+      return { success: true, result: result.data || result };
+    } catch (error: any) {
+      console.error('[Email Service] Domain update error:', error);
+      return { success: false, error: error.message || error };
+    }
   }
 
   private async dispatchEmail(
