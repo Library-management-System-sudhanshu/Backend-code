@@ -1,98 +1,145 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# StudyFlow backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Express + TypeScript API with Sequelize and PostgreSQL. Run the API on a Windows
+or Mac laptop and keep application records in a remote Supabase database.
+The NestJS dependencies are legacy; `src/server.ts` starts Express.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
-
-## Description
-
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
-
-```bash
-$ npm install
+```text
+Frontend / mobile app -> local Express API -> Sequelize -> Supabase PostgreSQL
+                       localhost:3000/api                  remote records
 ```
 
-## Compile and run the project
+## Connect your existing Supabase project
 
-```bash
-# development
-$ npm run start
+1. Install Node.js 22 LTS and npm, then open a terminal in this repository.
+2. Run these commands (same commands in macOS Terminal and Windows PowerShell):
 
-# watch mode
-$ npm run start:dev
+   ```sh
+   npm install
+   npm run setup:env
+   ```
 
-# production mode
-$ npm run start:prod
+   Setup creates `.env` and generates a JWT secret. It never overwrites an existing
+   `.env`. This file is ignored by Git; each laptop needs its own copy.
+
+3. In Supabase, open your project, click **Connect**, and select **Session pooler**.
+   Copy its PostgreSQL URI (port **5432**) into `DATABASE_URL` in `.env`.
+   Copy the exact host and username from the dashboard. Replace `[YOUR-PASSWORD]`
+   with the **database password**, percent-encoding reserved characters
+   (for example `@` becomes `%40`, `#` becomes `%23`). This is not an API key.
+   Keep credentials in `.env`, not in chat, frontend code, or Git.
+
+   ```dotenv
+   DATABASE_URL=postgresql://postgres.YOUR_PROJECT_REF:YOUR_URL_ENCODED_PASSWORD@YOUR_POOLER_HOST:5432/postgres
+   DB_SSL=true
+   DB_SSL_CA_PATH=
+   ```
+
+   Keep SSL parameters out of the URI; this app configures TLS using `DB_SSL` and
+   `DB_SSL_CA_PATH`. TLS certificate verification is enabled. If the database CA
+   is not trusted by Node, download its root certificate from Supabase's database
+   settings and set `DB_SSL_CA_PATH=./certs/prod-supabase.cer` (or the actual path).
+   On Windows, forward slashes also work in paths.
+
+4. This architecture uses Express authorization and direct SQL, not Supabase Auth
+   or the Data API. For a dedicated project, disable the **Data API** in Supabase
+   API settings. If you already use that API, configure table grants/RLS before
+   creating StudyFlow tables: Sequelize creates tables in `public` without RLS,
+   and direct API access must not bypass Express authorization.
+
+5. Test connectivity without creating tables or starting reminders:
+
+   ```sh
+   npm run db:check
+   ```
+
+6. For an empty database, leave `DB_SYNC=true` and start the API:
+
+   ```sh
+   npm run start:dev
+   ```
+
+   Startup creates missing model tables and runs the existing student-status enum
+   cleanup. It does not seed accounts or copy old records. After first successful
+   startup, set `DB_SYNC=false` to skip schema work on subsequent starts. This is
+   bootstrap synchronization, not a versioned migration system; later model changes
+   to existing tables need explicit migrations.
+
+7. Point the frontend API base URL to `http://localhost:3000/api`. Register/login
+   through the app or included Postman collection. Records such as students,
+   seats, and payments are stored in Supabase and visible in its Table Editor.
+   `/api` itself has no landing page; a 404 there does not mean the server is broken.
+   Endpoints include `POST /api/auth/register`, `POST /api/auth/login`, and
+   authenticated `GET /api/students`.
+
+The [Supabase connection guide](https://supabase.com/docs/guides/database/connecting-to-postgres)
+explains the Session pooler, IPv4 access, and certificate setup.
+
+## What is remote and what remains local
+
+| Component | Location |
+| --- | --- |
+| Users, workspaces, students, seats, payments, attendance and other SQL records | Supabase PostgreSQL |
+| Express API and business logic | Your running laptop |
+| Uploaded image files | Local `uploads/` directory |
+| Scheduled jobs | API process, when enabled |
+
+This change connects database storage only. Images are not uploaded to Supabase
+Storage: local URLs will not share files across laptops. Existing database contents
+are not automatically migrated. Internet access is required for database operations.
+Closing the laptop stops its API, while remote records remain stored.
+
+Both laptops can use the same database URI and modify the same records. Keep the
+same `JWT_SECRET` if tokens should work across servers; independently generated
+secrets require logging in again on the other server. A phone or another computer
+must use the laptop's reachable LAN address, not its own `localhost`, for the API.
+
+## Configuration
+
+| Variable | Meaning |
+| --- | --- |
+| `DATABASE_URL` | PostgreSQL URI; takes precedence over individual connection fields |
+| `DB_SSL` | `true` or `false`; defaults to true with a URI, false with individual fields |
+| `DB_SSL_CA_PATH` | Optional PEM root CA file; requires SSL |
+| `PORT` | Local API port, default `3000` |
+| `JWT_SECRET` | Token signing secret; generated by setup |
+| `DB_SYNC` | `false` skips startup schema cleanup and synchronization; existing default is enabled |
+| `CRON_ENABLED` | `false` skips reminders; the new laptop template disables them |
+
+Enable cron on only one server if you want scheduled reminders. Jobs run at 09:00
+in that server's timezone, only while it is running. Firebase push notifications
+and WAHA WhatsApp remain optional integrations; check their existing configuration
+before enabling messaging against shared data.
+
+For local PostgreSQL instead, remove `DATABASE_URL`, set `DB_SSL=false`, and set
+`DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, and `DB_DATABASE`. Defaults are
+localhost, 5432, postgres, postgres, and studyflow. The SQLite file is unused.
+Other remote PostgreSQL providers work with their URI and appropriate certificate.
+
+## Commands
+
+```sh
+npm run setup:env    # Create local config without overwriting it
+npm run db:check     # Connectivity check; no schema sync, app or cron
+npm run start:dev    # Local API with reload
+npm run build       # Compile TypeScript
+npm run start:prod   # Run compiled API
+npm test -- --runInBand
 ```
 
-## Run tests
+## Connection troubleshooting
 
-```bash
-# unit tests
-$ npm run test
+- Authentication failure: check database password, URI encoding and exact pooler
+  username. A Supabase publishable/anon key is not a database password.
+- Host unreachable/timeout: confirm the project is running, outbound 5432 is
+  allowed, and any Supabase network restrictions allow the laptop. Use Session
+  pooler if your network does not support the direct endpoint's IPv6 address.
+- Certificate error: download the database CA and set `DB_SSL_CA_PATH`; keep
+  certificate verification enabled.
+- Missing tables: use `DB_SYNC=true` once against the intended empty database.
+- Existing data absent: verify both laptops use the same project; connecting a
+  new database does not copy data from an old one.
 
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
-```
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+The existing deployment workflow uses a self-hosted GitHub Actions runner when
+`main` changes. `deploy.sh` builds and restarts PM2's `studyflow-api` process.
+That deployment is not required for running the API on your laptop.
