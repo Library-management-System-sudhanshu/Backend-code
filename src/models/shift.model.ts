@@ -57,6 +57,13 @@ export class Shift extends Model<Shift> {
   @Column({ type: DataType.JSON, allowNull: true })
   customPricing: any;
 
+
+  @Column({ type: DataType.ENUM('BASE', 'CLUBBED'), defaultValue: 'BASE' })
+  type: string;
+
+  @Column({ type: DataType.JSON, defaultValue: [] })
+  baseShiftIds: string[];
+
   @HasMany(() => SeatAllocation)
   allocations: SeatAllocation[];
 }

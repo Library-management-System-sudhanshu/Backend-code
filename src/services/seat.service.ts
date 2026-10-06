@@ -171,15 +171,17 @@ export class SeatService {
     if (!shift) throw new NotFoundException('Shift not found');
 
     // Check if there is already an active allocation for this seat and shift
-    const existingAllocation = await SeatAllocation.findOne({
-      where: {
-        seatId,
-        shiftId,
-        isActive: true,
-      },
-    });
-    if (existingAllocation) {
-      throw new BadRequestException('Seat is already occupied in this shift');
+    const shiftObj = await Shift.findByPk(shiftId);
+    if (!shiftObj) throw new NotFoundException('Shift not found');
+    const targetShiftIds = (shiftObj.type === 'CLUBBED' && shiftObj.baseShiftIds && shiftObj.baseShiftIds.length > 0) ? shiftObj.baseShiftIds : [shiftId];
+
+    for (const sid of targetShiftIds) {
+      const existingAllocation = await SeatAllocation.findOne({
+        where: { seatId, shiftId: sid, isActive: true },
+      });
+      if (existingAllocation) {
+        throw new BadRequestException('Seat is already occupied in one of the required shifts');
+      }
     }
 
     // Find student's current active allocations to update their old seats' status
@@ -206,21 +208,24 @@ export class SeatService {
       }
     }
 
-    // Create allocation
-    const allocation = await SeatAllocation.create({
-      workspaceId: student.workspaceId,
-      studentProfileId,
-      seatId,
-      shiftId,
-      startDate: new Date(startDate),
-      endDate: new Date(endDate),
-      isActive: true,
-    } as any);
+    // Create allocation for each target shift
+    let lastAlloc;
+    for (const sid of targetShiftIds) {
+      lastAlloc = await SeatAllocation.create({
+        workspaceId: student.workspaceId,
+        studentProfileId,
+        seatId,
+        shiftId: sid,
+        startDate: new Date(startDate),
+        endDate: new Date(endDate),
+        isActive: true,
+      } as any);
+    }
 
     // Update seat status to OCCUPIED
     await seat.update({ status: SeatStatus.OCCUPIED });
 
-    return allocation;
+    return lastAlloc;
   }
 
   async transferSeat(allocationId: string, targetSeatId: string) {
@@ -236,19 +241,40 @@ export class SeatService {
       throw new BadRequestException(`Target seat is ${targetSeat.status.toLowerCase()}`);
     }
 
-    const targetSeatShiftAlloc = await SeatAllocation.findOne({
+    // When transferring, we need to find ALL active allocations for this student on the old seat
+    // because they might have been booked under a clubbed shift (resulting in multiple allocations)
+    const allStudentAllocsOnOldSeat = await SeatAllocation.findAll({
       where: {
-        seatId: targetSeatId,
-        shiftId: allocation.shiftId,
-        isActive: true,
+        studentProfileId: allocation.studentProfileId,
+        seatId: allocation.seatId,
+        isActive: true
       }
     });
-    if (targetSeatShiftAlloc) {
-      throw new BadRequestException('Target seat is already occupied in this shift');
+
+    for (const alloc of allStudentAllocsOnOldSeat) {
+      const targetSeatShiftAlloc = await SeatAllocation.findOne({
+        where: { seatId: targetSeatId, shiftId: alloc.shiftId, isActive: true }
+      });
+      if (targetSeatShiftAlloc) {
+        throw new BadRequestException('Target seat is already occupied in one of the required shifts');
+      }
     }
 
-    // Deactivate old allocation
-    await allocation.update({ isActive: false });
+    let lastNewAlloc;
+    for (const alloc of allStudentAllocsOnOldSeat) {
+      await alloc.update({ isActive: false });
+      
+      lastNewAlloc = await SeatAllocation.create({
+        workspaceId: alloc.workspaceId,
+        studentProfileId: alloc.studentProfileId,
+        seatId: targetSeatId,
+        shiftId: alloc.shiftId,
+        startDate: new Date(),
+        endDate: alloc.endDate,
+        isActive: true,
+      } as any);
+    }
+    
     if (oldSeat) {
       const oldSeatActiveCount = await SeatAllocation.count({
         where: { seatId: allocation.seatId, isActive: true }
@@ -258,21 +284,10 @@ export class SeatService {
       }
     }
 
-    // Create new allocation
-    const newAllocation = await SeatAllocation.create({
-      workspaceId: allocation.workspaceId,
-      studentProfileId: allocation.studentProfileId,
-      seatId: targetSeatId,
-      shiftId: allocation.shiftId,
-      startDate: new Date(),
-      endDate: allocation.endDate,
-      isActive: true,
-    } as any);
-
     // Update target seat status
     await targetSeat.update({ status: SeatStatus.OCCUPIED });
 
-    return newAllocation;
+    return lastNewAlloc;
   }
 
   async vacateSeat(seatId: string, studentProfileId?: string) {
