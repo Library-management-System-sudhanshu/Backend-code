@@ -6,6 +6,8 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
+    "setup:env": "ts-node src/scripts/setup-env.ts",
+    "db:check": "ts-node src/scripts/check-database.ts",
     "build": "tsc",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "ts-node src/server.ts",

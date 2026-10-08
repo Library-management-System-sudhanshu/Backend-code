@@ -197,7 +197,7 @@ export class StudentService {
         } as any);
 
         const amountPaid = data.amountPaid !== undefined ? Number(data.amountPaid) : plan.price;
-        const dueAmount = Math.max(0, plan.price - amountPaid);
+        const dueAmount = data.isDiscounted ? 0 : Math.max(0, plan.price - amountPaid);
         if (dueAmount > 0) {
           await profile.update({ dueAmount });
         }
@@ -219,19 +219,21 @@ export class StudentService {
       const shift = await Shift.findByPk(data.shiftId);
       if (shift) {
         // Find or create a SubscriptionPlan corresponding to this shift
+        const inputDuration = data.durationDays ? Number(data.durationDays) : 30;
+        const inputPrice = data.shiftPrice !== undefined ? Number(data.shiftPrice) : shift.price;
         let plan = await SubscriptionPlan.findOne({
           where: {
-            name: `${shift.name} Plan`,
+            name: `${shift.name} Plan (${inputDuration} Days)`,
             workspaceId: data.workspaceId,
-            price: shift.price,
+            price: inputPrice,
           },
         });
         if (!plan) {
           plan = await SubscriptionPlan.create({
-            name: `${shift.name} Plan`,
+            name: `${shift.name} Plan (${inputDuration} Days)`,
             workspaceId: data.workspaceId,
-            price: shift.price,
-            durationDays: 30, // Default to monthly
+            price: inputPrice,
+            durationDays: inputDuration,
             isActive: true,
           } as any);
         }
@@ -247,8 +249,8 @@ export class StudentService {
           status: 'ACTIVE',
         } as any);
 
-        const amountPaid = data.amountPaid !== undefined ? Number(data.amountPaid) : shift.price;
-        const dueAmount = Math.max(0, shift.price - amountPaid);
+        const amountPaid = data.amountPaid !== undefined ? Number(data.amountPaid) : inputPrice;
+        const dueAmount = data.isDiscounted ? 0 : Math.max(0, inputPrice - amountPaid);
         if (dueAmount > 0) {
           await profile.update({ dueAmount });
         }
