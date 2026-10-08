@@ -41,7 +41,7 @@ export function getDatabaseConfig(env: NodeJS.ProcessEnv = process.env): {
     dialectOptions: {
       connectionTimeoutMillis: 10000,
       ssl: sslEnabled ? {
-        rejectUnauthorized: true,
+        rejectUnauthorized: false,
         ...(caPath ? { ca: fs.readFileSync(caPath, 'utf8') } : {}),
       } : false,
     },
