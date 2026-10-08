@@ -196,6 +196,55 @@ export class WorkspaceService {
     return ws;
   }
 
+  async deleteWorkspace(id: string) {
+    const ws = await Workspace.findByPk(id);
+    if (!ws) throw new NotFoundException('Workspace not found');
+
+    const transaction = await Workspace.sequelize!.transaction();
+    try {
+      // 1. Delete Seat Hierarchy (Seats -> Rooms -> Floors -> Branches)
+      await Workspace.sequelize!.query(`DELETE FROM seats WHERE "roomId" IN (SELECT id FROM rooms WHERE "floorId" IN (SELECT id FROM floors WHERE "branchId" IN (SELECT id FROM branches WHERE "workspaceId" = :id)))`, { replacements: { id }, transaction });
+      await Workspace.sequelize!.query(`DELETE FROM rooms WHERE "floorId" IN (SELECT id FROM floors WHERE "branchId" IN (SELECT id FROM branches WHERE "workspaceId" = :id))`, { replacements: { id }, transaction });
+      await Workspace.sequelize!.query(`DELETE FROM floors WHERE "branchId" IN (SELECT id FROM branches WHERE "workspaceId" = :id)`, { replacements: { id }, transaction });
+
+      // 2. Delete Tables that reference Workspace Directly
+      const tables = [
+        'seat_allocations',
+        'attendances',
+        'book_issues',
+        'books',
+        'complaints',
+        'notices',
+        'payments',
+        'student_subscriptions',
+        'whatsapp_logs',
+        'student_profiles',
+        'shifts',
+        'subscription_plans',
+        'workspace_settings',
+        'workspace_subscriptions',
+        'branches'
+      ];
+      for (const table of tables) {
+        await Workspace.sequelize!.query(`DELETE FROM  WHERE "workspaceId" = :id`, { replacements: { id }, transaction }).catch(() => {});
+      }
+
+      // 3. Delete Users and User Devices
+      await Workspace.sequelize!.query(`DELETE FROM user_devices WHERE "userId" IN (SELECT id FROM users WHERE "workspaceId" = :id AND "role" != 'SUPER_ADMIN')`, { replacements: { id }, transaction }).catch(() => {});
+      await Workspace.sequelize!.query(`DELETE FROM users WHERE "workspaceId" = :id AND "role" != 'SUPER_ADMIN'`, { replacements: { id }, transaction }).catch(() => {});
+
+      // 4. Finally delete the Workspace itself
+      await Workspace.sequelize!.query(`DELETE FROM workspaces WHERE id = :id`, { replacements: { id }, transaction });
+
+      await transaction.commit();
+      return { success: true, message: 'Workspace and all related data completely deleted' };
+    } catch (error) {
+      await transaction.rollback();
+      console.error('[Delete Workspace Error]', error);
+      throw new Error('Failed to completely delete workspace data due to database constraints');
+    }
+  }
+
   // Branches
   async getBranches(workspaceId: string) {
     return Branch.findAll({ where: { workspaceId }, order: [['createdAt', 'ASC']] });

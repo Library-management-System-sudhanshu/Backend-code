@@ -41,6 +41,15 @@ export class WorkspaceController {
     }
   }
 
+  async deleteWorkspace(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await workspaceService.deleteWorkspace((req.params.id as string));
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   // Branches
   async getBranches(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {

@@ -70,7 +70,8 @@ export class PaymentService {
       }
     }
 
-    const dueAmount = data.isDiscounted ? 0 : Math.max(0, finalTotalAmount - amount);
+    const discountAmount = data.discountAmount ? Number(data.discountAmount) : 0;
+    const dueAmount = Math.max(0, finalTotalAmount - amount - discountAmount);
     if (dueAmount > 0) {
       student.dueAmount = Number(student.dueAmount || 0) + dueAmount;
       await student.save();

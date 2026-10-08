@@ -197,9 +197,10 @@ export class StudentService {
         } as any);
 
         const amountPaid = data.amountPaid !== undefined ? Number(data.amountPaid) : plan.price;
-        const dueAmount = data.isDiscounted ? 0 : Math.max(0, plan.price - amountPaid);
+        const discountAmount = data.discountAmount ? Number(data.discountAmount) : 0;
+        const dueAmount = Math.max(0, plan.price - amountPaid - discountAmount);
         if (dueAmount > 0) {
-          await profile.update({ dueAmount });
+          await profile.update({ dueAmount: Number(profile.dueAmount || 0) + dueAmount });
         }
 
         await Payment.create({
@@ -250,9 +251,10 @@ export class StudentService {
         } as any);
 
         const amountPaid = data.amountPaid !== undefined ? Number(data.amountPaid) : inputPrice;
-        const dueAmount = data.isDiscounted ? 0 : Math.max(0, inputPrice - amountPaid);
+        const discountAmount = data.discountAmount ? Number(data.discountAmount) : 0;
+        const dueAmount = Math.max(0, inputPrice - amountPaid - discountAmount);
         if (dueAmount > 0) {
-          await profile.update({ dueAmount });
+          await profile.update({ dueAmount: Number(profile.dueAmount || 0) + dueAmount });
         }
 
         await Payment.create({

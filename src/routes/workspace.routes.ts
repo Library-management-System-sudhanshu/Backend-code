@@ -16,6 +16,7 @@ router.get('/', requireRoles('SUPER_ADMIN'), (req, res, next) => controller.getA
 router.post('/', requireRoles('SUPER_ADMIN'), (req, res, next) => controller.createWorkspace(req, res, next));
 router.get('/:id', requireRoles('SUPER_ADMIN', 'OWNER', 'MANAGER'), (req, res, next) => controller.getWorkspaceById(req, res, next));
 router.patch('/:id', requireRoles('SUPER_ADMIN', 'OWNER'), (req, res, next) => controller.updateWorkspace(req, res, next));
+router.delete('/:id', requireRoles('SUPER_ADMIN'), (req, res, next) => controller.deleteWorkspace(req, res, next));
 
 // SaaS Subscription Management
 router.get('/:id/saas-subscription', requireRoles('SUPER_ADMIN', 'OWNER'), (req, res, next) => controller.getSaaSSubscription(req, res, next));
