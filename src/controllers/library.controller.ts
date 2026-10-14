@@ -6,7 +6,11 @@ import { AuthenticatedRequest } from '../middlewares/auth.middleware';
 const libraryService = new LibraryService();
 
 export class LibraryController {
-  async listBooks(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async listBooks(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
       const workspaceId = req.query.workspaceId as string;
       const result = await libraryService.listBooks(workspaceId);
@@ -16,9 +20,14 @@ export class LibraryController {
     }
   }
 
-  async createBook(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async createBook(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
-      const workspaceId = (req.body.workspaceId || req.query.workspaceId) as string;
+      const workspaceId = (req.body.workspaceId ||
+        req.query.workspaceId) as string;
       const result = await libraryService.createBook(workspaceId, req.body);
       res.status(201).json(result);
     } catch (error) {
@@ -26,75 +35,125 @@ export class LibraryController {
     }
   }
 
-  async updateBook(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async updateBook(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
-      const result = await libraryService.updateBook((req.params.id as string), req.body);
+      const result = await libraryService.updateBook(
+        req.params.id as string,
+        req.body,
+      );
       res.status(200).json(result);
     } catch (error) {
       next(error);
     }
   }
 
-  async deleteBook(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async deleteBook(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
-      const result = await libraryService.deleteBook((req.params.id as string));
+      const result = await libraryService.deleteBook(req.params.id as string);
       res.status(200).json(result);
     } catch (error) {
       next(error);
     }
   }
 
-  async issueBook(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async issueBook(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
-      const workspaceId = (req.body.workspaceId || req.query.workspaceId) as string;
-      const result = await libraryService.issueBook(workspaceId, req.body);
+      const workspaceId = (req.body.workspaceId ||
+        req.query.workspaceId) as string;
+      const result = await libraryService.issueBook(workspaceId, {
+        ...req.body,
+        issuedById: (req as AuthenticatedRequest).user!.id,
+      });
       res.status(201).json(result);
     } catch (error) {
       next(error);
     }
   }
 
-  async returnBook(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async returnBook(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
-      const result = await libraryService.returnBook((req.params.issueId as string));
+      const result = await libraryService.returnBook(
+        req.params.issueId as string,
+      );
       res.status(200).json(result);
     } catch (error) {
       next(error);
     }
   }
 
-  async getIssuedBooks(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getIssuedBooks(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
       const workspaceId = req.query.workspaceId as string;
-      const result = await libraryService.getIssuedBooks(workspaceId);
+      const result = await libraryService.getIssuedBooks(
+        workspaceId,
+        req.query.branchId as string,
+      );
       res.status(200).json(result);
     } catch (error) {
       next(error);
     }
   }
 
-  async getStudentIssuedBooks(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getStudentIssuedBooks(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
-      const result = await libraryService.getStudentIssuedBooks((req.params.studentProfileId as string));
+      const result = await libraryService.getStudentIssuedBooks(
+        req.params.studentProfileId as string,
+      );
       res.status(200).json(result);
     } catch (error) {
       next(error);
     }
   }
 
-  async requestBook(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async requestBook(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
       const authReq = req as AuthenticatedRequest;
       let studentProfileId = req.body.studentProfileId;
       if (authReq.user?.role === 'STUDENT') {
-        const profile = await StudentProfile.findOne({ where: { userId: authReq.user.id } });
+        const profile = await StudentProfile.findOne({
+          where: {
+            userId: authReq.user.id,
+            workspaceId: authReq.user.workspaceId,
+          },
+        });
         if (!profile) {
           res.status(404).json({ message: 'Student profile not found' });
           return;
         }
         studentProfileId = profile.id;
       }
-      const result = await libraryService.requestBook(req.body.bookId, studentProfileId);
+      const result = await libraryService.requestBook(
+        req.body.bookId,
+        studentProfileId,
+      );
       res.status(201).json(result);
     } catch (error) {
       next(error);

@@ -29,10 +29,11 @@ router.use('/notices', noticeRoutes);
 router.use('/safety', safetyRoutes);
 router.use('/saas-plans', saasPlanRoutes);
 
+import { authenticateJWT } from '../middlewares/auth.middleware';
 import fs from 'fs';
 import path from 'path';
 
-router.post('/upload', (req, res) => {
+router.post('/upload', authenticateJWT, (req, res) => {
   try {
     const { base64 } = req.body;
     if (!base64) {
@@ -46,7 +47,7 @@ router.post('/upload', (req, res) => {
 
     const type = matches[1];
     const data = Buffer.from(matches[2], 'base64');
-    
+
     let extension = 'png';
     if (type.includes('jpeg') || type.includes('jpg')) extension = 'jpg';
     if (type.includes('webp')) extension = 'webp';

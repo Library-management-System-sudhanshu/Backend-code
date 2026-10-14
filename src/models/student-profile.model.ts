@@ -1,4 +1,13 @@
-import { Table, Column, Model, DataType, ForeignKey, BelongsTo, HasMany, Index } from 'sequelize-typescript';
+import {
+  Table,
+  Column,
+  Model,
+  DataType,
+  ForeignKey,
+  BelongsTo,
+  HasMany,
+  Index,
+} from 'sequelize-typescript';
 import { User } from './user.model';
 import { Branch } from './branch.model';
 import { Workspace } from './workspace.model';
@@ -22,8 +31,31 @@ export enum Gender {
   OTHER = 'OTHER',
 }
 
-@Table({ tableName: 'student_profiles', paranoid: true })
+@Table({
+  tableName: 'student_profiles',
+  paranoid: true,
+  indexes: [
+    {
+      unique: true,
+      fields: ['userId', 'workspaceId'],
+      where: { deletedAt: null },
+    },
+  ],
+})
 export class StudentProfile extends Model<StudentProfile> {
+  toJSON(): any {
+    const values: any = { ...this.get({ plain: true }) };
+    if (values.user)
+      values.user = {
+        id: this.userId,
+        name: this.displayName,
+        email: this.contactEmail,
+        mobile: this.contactMobile,
+        avatar: this.avatar,
+      };
+    return values;
+  }
+
   @Column({
     type: DataType.UUID,
     defaultValue: DataType.UUIDV4,
@@ -33,8 +65,13 @@ export class StudentProfile extends Model<StudentProfile> {
 
   @Index
   @ForeignKey(() => User)
-  @Column({ type: DataType.UUID, allowNull: false, unique: true })
+  @Column({ type: DataType.UUID, allowNull: false })
   userId: string;
+
+  @Column({ type: DataType.STRING, allowNull: true }) displayName: string;
+  @Column({ type: DataType.STRING, allowNull: true }) contactEmail: string;
+  @Column({ type: DataType.STRING, allowNull: true }) contactMobile: string;
+  @Column({ type: DataType.STRING, allowNull: true }) avatar: string;
 
   @BelongsTo(() => User, { onDelete: 'CASCADE' })
   user: User;

@@ -1,3 +1,4 @@
+import { workspaceAccess } from './workspace-access.service';
 import { WhatsAppLog } from '../models/whatsapp-log.model';
 import { StudentProfile } from '../models/student-profile.model';
 import { User } from '../models/user.model';
@@ -7,7 +8,7 @@ import { StudentSubscription } from '../models/student-subscription.model';
 export class WhatsAppService {
   private static customTemplates: any[] = [];
 
-  async getTemplates() {
+  async getTemplates(workspaceId: string) {
     const defaultTemplates = [
       {
         id: 'fee_reminder',
@@ -31,13 +32,19 @@ export class WhatsAppService {
       },
     ];
 
-    return [...defaultTemplates, ...WhatsAppService.customTemplates];
+    return [
+      ...defaultTemplates,
+      ...WhatsAppService.customTemplates.filter(
+        (t) => t.workspaceId === workspaceId,
+      ),
+    ];
   }
 
-  async createTemplate(data: any) {
+  async createTemplate(workspaceId: string, data: any) {
     const id = `custom_${Date.now()}`;
     const newTemplate = {
       id,
+      workspaceId,
       name: data.name,
       text: data.text,
     };
@@ -46,14 +53,14 @@ export class WhatsAppService {
   }
 
   async sendMessage(workspaceId: string, studentProfileId: string, data: any) {
+    if ((await workspaceAccess(workspaceId)).mode !== 'FULL') return null;
     const { templateId, customVariables } = data;
 
     const student = await StudentProfile.findOne({
-      where: { id: studentProfileId, status: 'APPROVED' },
+      where: { id: studentProfileId, workspaceId, status: 'APPROVED' },
       include: [
         {
           model: User,
-          where: { workspaceId },
           required: true,
         },
       ],
@@ -63,12 +70,12 @@ export class WhatsAppService {
       return null;
     }
 
-    const templates = await this.getTemplates();
+    const templates = await this.getTemplates(workspaceId);
     const template = templates.find((t) => t.id === templateId);
     const templateText = template ? template.text : 'Broadcast message';
 
-    const recipient = student.user.mobile || 'Unknown';
-    let message = templateText.replace('{{studentName}}', student.user.name);
+    const recipient = student.contactMobile || 'Unknown';
+    let message = templateText.replace('{{studentName}}', student.displayName);
 
     if (customVariables) {
       Object.keys(customVariables).forEach((key) => {
@@ -92,7 +99,7 @@ export class WhatsAppService {
     const { templateId, customVariables, filters, studentIds } = data;
     const { branchId, shiftId, status } = filters || {};
 
-    const profileWhere: any = { status: 'APPROVED' };
+    const profileWhere: any = { workspaceId, status: 'APPROVED' };
     if (branchId) profileWhere.branchId = branchId;
     if (studentIds && studentIds.length > 0) {
       profileWhere.id = studentIds;
@@ -101,7 +108,6 @@ export class WhatsAppService {
     const includeList: any[] = [
       {
         model: User,
-        where: { workspaceId },
         required: true,
       },
     ];
@@ -133,11 +139,18 @@ export class WhatsAppService {
     if (status && status !== 'ALL') {
       students = students.filter((student) => {
         if (status === 'ACTIVE') {
-          return student.subscriptions && student.subscriptions.some(s => s.status === 'ACTIVE');
+          return (
+            student.subscriptions &&
+            student.subscriptions.some((s) => s.status === 'ACTIVE')
+          );
         }
         if (status === 'EXPIRED') {
-          const hasActive = student.subscriptions && student.subscriptions.some(s => s.status === 'ACTIVE');
-          const hasExpired = student.subscriptions && student.subscriptions.some(s => s.status === 'EXPIRED');
+          const hasActive =
+            student.subscriptions &&
+            student.subscriptions.some((s) => s.status === 'ACTIVE');
+          const hasExpired =
+            student.subscriptions &&
+            student.subscriptions.some((s) => s.status === 'EXPIRED');
           return !hasActive && hasExpired;
         }
         if (status === 'EXPIRING_SOON') {
@@ -145,28 +158,35 @@ export class WhatsAppService {
           today.setHours(0, 0, 0, 0);
           const sevenDaysLater = new Date(today);
           sevenDaysLater.setDate(today.getDate() + 7);
-          return student.subscriptions && student.subscriptions.some(s => {
-            if (s.status !== 'ACTIVE') return false;
-            const endDate = new Date(s.endDate);
-            return endDate >= today && endDate <= sevenDaysLater;
-          });
+          return (
+            student.subscriptions &&
+            student.subscriptions.some((s) => {
+              if (s.status !== 'ACTIVE') return false;
+              const endDate = new Date(s.endDate);
+              return endDate >= today && endDate <= sevenDaysLater;
+            })
+          );
         }
         if (status === 'NO_SEAT') {
-          const hasActiveSeat = student.allocations && student.allocations.some(a => a.isActive);
+          const hasActiveSeat =
+            student.allocations && student.allocations.some((a) => a.isActive);
           return !hasActiveSeat;
         }
         return true;
       });
     }
 
-    const templates = await this.getTemplates();
+    const templates = await this.getTemplates(workspaceId);
     const template = templates.find((t) => t.id === templateId);
     const templateText = template ? template.text : 'Broadcast message';
 
     const logs: any[] = [];
     for (const student of students) {
-      const recipient = student.user.mobile || 'Unknown';
-      let message = templateText.replace('{{studentName}}', student.user.name);
+      const recipient = student.contactMobile || 'Unknown';
+      let message = templateText.replace(
+        '{{studentName}}',
+        student.displayName,
+      );
 
       if (customVariables) {
         Object.keys(customVariables).forEach((key) => {
@@ -199,20 +219,28 @@ export class WhatsAppService {
     });
   }
 
-  private async dispatchToWaha(recipient: string, message: string): Promise<boolean> {
+  private async dispatchToWaha(
+    recipient: string,
+    message: string,
+  ): Promise<boolean> {
     const wahaUrl = process.env.WAHA_URL;
     const apiKey = process.env.WAHA_API_KEY;
     const session = process.env.WAHA_SESSION || 'default';
 
     if (!wahaUrl) {
-      console.log(`[WhatsApp Simulator (Fallback)] Sending message to ${recipient}: "${message}"`);
+      console.log(
+        `[WhatsApp Simulator (Fallback)] Sending message to ${recipient}: "${message}"`,
+      );
       return true;
     }
 
     // Sanitize recipient number to digits only
     const sanitizedRecipient = recipient.replace(/\D/g, '');
     if (!sanitizedRecipient) {
-      console.error('[WhatsApp Service Error] Recipient number contains no digits:', recipient);
+      console.error(
+        '[WhatsApp Service Error] Recipient number contains no digits:',
+        recipient,
+      );
       return false;
     }
 
@@ -229,7 +257,9 @@ export class WhatsAppService {
         headers['X-Api-Key'] = apiKey;
       }
 
-      console.log(`[WhatsApp API Call] Sending to ${chatId} via WAHA at ${url}...`);
+      console.log(
+        `[WhatsApp API Call] Sending to ${chatId} via WAHA at ${url}...`,
+      );
 
       const response = await fetch(url, {
         method: 'POST',
@@ -244,12 +274,15 @@ export class WhatsAppService {
       const responseData = (await response.json()) as any;
 
       if (!response.ok) {
-        console.error('[WhatsApp Service Error] WAHA API Error Response:', responseData);
+        console.error(
+          '[WhatsApp Service Error] WAHA API Error Response:',
+          responseData,
+        );
         return false;
       }
 
       console.log(
-        `[WhatsApp Service Success] Message sent successfully to ${chatId}. Message ID: ${responseData?.id}`
+        `[WhatsApp Service Success] Message sent successfully to ${chatId}. Message ID: ${responseData?.id}`,
       );
       return true;
     } catch (error) {

@@ -5,7 +5,11 @@ const workspaceService = new WorkspaceService();
 
 export class WorkspaceController {
   // Workspaces CRUD (Super Admin)
-  async createWorkspace(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async createWorkspace(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
       const result = await workspaceService.createWorkspace(req.body);
       res.status(201).json(result);
@@ -14,7 +18,11 @@ export class WorkspaceController {
     }
   }
 
-  async getAllWorkspaces(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getAllWorkspaces(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
       const result = await workspaceService.getAllWorkspaces();
       res.status(200).json(result);
@@ -23,18 +31,76 @@ export class WorkspaceController {
     }
   }
 
-  async getWorkspaceById(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getWorkspaceById(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
-      const result = await workspaceService.getWorkspaceById((req.params.id as string));
+      const result = await workspaceService.getWorkspaceById(
+        req.params.id as string,
+      );
       res.status(200).json(result);
     } catch (error) {
       next(error);
     }
   }
 
-  async updateWorkspace(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async updateWorkspace(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
-      const result = await workspaceService.updateWorkspace((req.params.id as string), req.body);
+      const result = await workspaceService.updateWorkspace(
+        req.params.id as string,
+        Object.fromEntries(
+          [
+            'name',
+            'address',
+            'pincode',
+            'logo',
+            'gstNumber',
+            ...((
+              req as import('../middlewares/auth.middleware').AuthenticatedRequest
+            ).user!.role === 'SUPER_ADMIN'
+              ? ['isActive']
+              : []),
+          ]
+            .filter((k) => req.body[k] !== undefined)
+            .map((k) => [k, req.body[k]]),
+        ),
+      );
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async deleteWorkspace(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const result = await workspaceService.deleteWorkspace(
+        req.params.id as string,
+      );
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async deleteUser(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const result = await workspaceService.deleteUser(
+        req.params.userId as string,
+      );
       res.status(200).json(result);
     } catch (error) {
       next(error);
@@ -42,27 +108,48 @@ export class WorkspaceController {
   }
 
   // Branches
-  async getBranches(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getBranches(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
-      const result = await workspaceService.getBranches((req.params.workspaceId as string));
+      const result = await workspaceService.getBranches(
+        req.params.workspaceId as string,
+        req.query.branchId as string,
+      );
       res.status(200).json(result);
     } catch (error) {
       next(error);
     }
   }
 
-  async createBranch(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async createBranch(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
-      const result = await workspaceService.createBranch((req.params.workspaceId as string), req.body);
+      const result = await workspaceService.createBranch(
+        req.params.workspaceId as string,
+        req.body,
+      );
       res.status(201).json(result);
     } catch (error) {
       next(error);
     }
   }
 
-  async updateBranch(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async updateBranch(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
-      const result = await workspaceService.updateBranch((req.params.id as string), req.body);
+      const result = await workspaceService.updateBranch(
+        req.params.id as string,
+        req.body,
+      );
       res.status(200).json(result);
     } catch (error) {
       next(error);
@@ -70,36 +157,62 @@ export class WorkspaceController {
   }
 
   // Shifts
-  async getShifts(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getShifts(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
-      const result = await workspaceService.getShifts((req.params.workspaceId as string));
+      const result = await workspaceService.getShifts(
+        req.params.workspaceId as string,
+      );
       res.status(200).json(result);
     } catch (error) {
       next(error);
     }
   }
 
-  async createShift(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async createShift(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
-      const result = await workspaceService.createShift((req.params.workspaceId as string), req.body);
+      const result = await workspaceService.createShift(
+        req.params.workspaceId as string,
+        req.body,
+      );
       res.status(201).json(result);
     } catch (error) {
       next(error);
     }
   }
 
-  async updateShift(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async updateShift(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
-      const result = await workspaceService.updateShift((req.params.id as string), req.body);
+      const result = await workspaceService.updateShift(
+        req.params.id as string,
+        req.body,
+      );
       res.status(200).json(result);
     } catch (error) {
       next(error);
     }
   }
 
-  async deleteShift(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async deleteShift(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
-      const result = await workspaceService.deleteShift((req.params.id as string));
+      const result = await workspaceService.deleteShift(
+        req.params.id as string,
+      );
       res.status(200).json(result);
     } catch (error) {
       next(error);
@@ -107,27 +220,47 @@ export class WorkspaceController {
   }
 
   // Subscription Plans
-  async getPlans(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getPlans(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
-      const result = await workspaceService.getPlans((req.params.workspaceId as string));
+      const result = await workspaceService.getPlans(
+        req.params.workspaceId as string,
+      );
       res.status(200).json(result);
     } catch (error) {
       next(error);
     }
   }
 
-  async createPlan(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async createPlan(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
-      const result = await workspaceService.createPlan((req.params.workspaceId as string), req.body);
+      const result = await workspaceService.createPlan(
+        req.params.workspaceId as string,
+        req.body,
+      );
       res.status(201).json(result);
     } catch (error) {
       next(error);
     }
   }
 
-  async updatePlan(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async updatePlan(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
-      const result = await workspaceService.updatePlan((req.params.id as string), req.body);
+      const result = await workspaceService.updatePlan(
+        req.params.id as string,
+        req.body,
+      );
       res.status(200).json(result);
     } catch (error) {
       next(error);
@@ -135,18 +268,31 @@ export class WorkspaceController {
   }
 
   // Workspace Settings
-  async getSettings(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getSettings(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
-      const result = await workspaceService.getSettings((req.params.workspaceId as string));
+      const result = await workspaceService.getSettings(
+        req.params.workspaceId as string,
+      );
       res.status(200).json(result);
     } catch (error) {
       next(error);
     }
   }
 
-  async updateSettings(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async updateSettings(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
-      const result = await workspaceService.updateSettings((req.params.workspaceId as string), req.body);
+      const result = await workspaceService.updateSettings(
+        req.params.workspaceId as string,
+        req.body,
+      );
       res.status(200).json(result);
     } catch (error) {
       next(error);
@@ -154,38 +300,69 @@ export class WorkspaceController {
   }
 
   // SaaS Subscriptions
-  async getSaaSSubscription(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getSaaSSubscription(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
-      const result = await workspaceService.getSaaSSubscription((req.params.id as string));
+      const result = await workspaceService.getSaaSSubscription(
+        req.params.id as string,
+      );
       res.status(200).json(result);
     } catch (error) {
       next(error);
     }
   }
 
-  async startSaaSTrial(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async startSaaSTrial(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
-      const { days } = req.body;
-      const result = await workspaceService.startSaaSTrial((req.params.id as string), days);
+      const days =
+        (req as import('../middlewares/auth.middleware').AuthenticatedRequest)
+          .user!.role === 'SUPER_ADMIN'
+          ? req.body.days
+          : 7;
+      const result = await workspaceService.startSaaSTrial(
+        req.params.id as string,
+        days,
+      );
       res.status(200).json(result);
     } catch (error) {
       next(error);
     }
   }
 
-  async createSaaSPayment(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async createSaaSPayment(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
       const { saasPlanId } = req.body;
-      const result = await workspaceService.createSaaSPayment((req.params.id as string), saasPlanId);
+      const result = await workspaceService.createSaaSPayment(
+        req.params.id as string,
+        saasPlanId,
+      );
       res.status(201).json(result);
     } catch (error) {
       next(error);
     }
   }
 
-  async verifySaaSPayment(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async verifySaaSPayment(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
-      const result = await workspaceService.verifySaaSPayment((req.params.id as string), req.body);
+      const result = await workspaceService.verifySaaSPayment(
+        req.params.id as string,
+        req.body,
+      );
       res.status(200).json(result);
     } catch (error) {
       next(error);

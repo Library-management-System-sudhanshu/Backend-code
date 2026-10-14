@@ -1,7 +1,16 @@
-import { Table, Column, Model, DataType, ForeignKey, BelongsTo, Index } from 'sequelize-typescript';
+import {
+  Table,
+  Column,
+  Model,
+  DataType,
+  ForeignKey,
+  BelongsTo,
+  Index,
+} from 'sequelize-typescript';
 import { StudentProfile } from './student-profile.model';
 import { SubscriptionPlan } from './subscription-plan.model';
 import { Workspace } from './workspace.model';
+import { StudentSubscription } from './student-subscription.model';
 import { Branch } from './branch.model';
 
 export enum PaymentMethod {
@@ -74,6 +83,22 @@ export class Payment extends Model<Payment> {
 
   @Column({ type: DataType.STRING, allowNull: true })
   transactionId: string;
+
+  @Column({ type: DataType.STRING, allowNull: true, unique: true })
+  orderId: string;
+
+  @Column({ type: DataType.DECIMAL(10, 2), allowNull: true })
+  totalAmount: number;
+
+  @Column({ type: DataType.DECIMAL(10, 2), allowNull: true })
+  discountAmount: number;
+
+  @ForeignKey(() => StudentSubscription)
+  @Column({ type: DataType.UUID, allowNull: true })
+  studentSubscriptionId: string;
+
+  @BelongsTo(() => StudentSubscription, { onDelete: 'CASCADE' })
+  studentSubscription: StudentSubscription;
 
   @Index
   @ForeignKey(() => SubscriptionPlan)

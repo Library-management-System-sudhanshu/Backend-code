@@ -55,9 +55,11 @@ export class CronService {
     for (const payment of payments) {
       if (!payment.studentProfile || !payment.studentProfile.user) continue;
 
-      const workspaceId = payment.studentProfile.user.workspaceId;
+      const workspaceId = payment.studentProfile.workspaceId;
       const amount = payment.amount.toString();
-      const dueDate = payment.dueDate ? payment.dueDate.toISOString().split('T')[0] : 'soon';
+      const dueDate = payment.dueDate
+        ? payment.dueDate.toISOString().split('T')[0]
+        : 'soon';
 
       await whatsappService.sendMessage(workspaceId, payment.studentProfileId, {
         templateId: 'fee_reminder',
@@ -105,10 +107,13 @@ export class CronService {
         where: { studentProfileId: sub.studentProfileId, isActive: true },
         include: ['seat'],
       });
-      
-      const seatNumber = allocation && allocation.seat ? allocation.seat.number : 'your seat';
-      const workspaceId = sub.studentProfile.user.workspaceId;
-      const endDate = sub.endDate ? sub.endDate.toISOString().split('T')[0] : 'soon';
+
+      const seatNumber =
+        allocation && allocation.seat ? allocation.seat.number : 'your seat';
+      const workspaceId = sub.studentProfile.workspaceId;
+      const endDate = sub.endDate
+        ? sub.endDate.toISOString().split('T')[0]
+        : 'soon';
 
       await whatsappService.sendMessage(workspaceId, sub.studentProfileId, {
         templateId: 'renewal_reminder',
@@ -123,7 +128,7 @@ export class CronService {
   }
   static async expireSaaSTrials() {
     const today = new Date();
-    
+
     // Find all TRIAL subscriptions where trialEndDate is <= now
     const expiredTrials = await WorkspaceSubscription.findAll({
       where: {
@@ -139,7 +144,7 @@ export class CronService {
       await trial.update({ status: 'EXPIRED' });
       count++;
     }
-    
+
     if (count > 0) {
       console.log(`[CronService] Expired ${count} SaaS trials.`);
     }

@@ -4,27 +4,45 @@ import { WhatsAppService } from '../services/whatsapp.service';
 const whatsappService = new WhatsAppService();
 
 export class WhatsAppController {
-  async getTemplates(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getTemplates(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
-      const result = await whatsappService.getTemplates();
+      const result = await whatsappService.getTemplates(
+        req.query.workspaceId as string,
+      );
       res.status(200).json(result);
     } catch (error) {
       next(error);
     }
   }
 
-  async createTemplate(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async createTemplate(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
-      const result = await whatsappService.createTemplate(req.body);
+      const result = await whatsappService.createTemplate(
+        req.body.workspaceId,
+        req.body,
+      );
       res.status(201).json(result);
     } catch (error) {
       next(error);
     }
   }
 
-  async sendBroadcast(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async sendBroadcast(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
-      const workspaceId = (req.body.workspaceId || req.query.workspaceId) as string;
+      const workspaceId = (req.body.workspaceId ||
+        req.query.workspaceId) as string;
       const result = await whatsappService.sendBroadcast(workspaceId, req.body);
       res.status(200).json(result);
     } catch (error) {
@@ -32,7 +50,11 @@ export class WhatsAppController {
     }
   }
 
-  async getLogs(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getLogs(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
       const workspaceId = req.query.workspaceId as string;
       const result = await whatsappService.getLogs(workspaceId);

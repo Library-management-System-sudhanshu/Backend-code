@@ -10,16 +10,25 @@ export function getDatabaseConfig(env: NodeJS.ProcessEnv = process.env): {
   if (url) {
     try {
       const parsed = new URL(url);
-      if (!['postgres:', 'postgresql:'].includes(parsed.protocol) || !parsed.hostname ||
-          /YOUR_|\[|\]/i.test(url)) {
+      if (
+        !['postgres:', 'postgresql:'].includes(parsed.protocol) ||
+        !parsed.hostname ||
+        /YOUR_|\[|\]/i.test(url)
+      ) {
         throw new Error();
       }
       // Keep TLS settings in one place; URL parameters can override driver options.
-      if (['sslmode', 'sslcert', 'sslkey', 'sslrootcert', 'ssl'].some(key => parsed.searchParams.has(key))) {
+      if (
+        ['sslmode', 'sslcert', 'sslkey', 'sslrootcert', 'ssl'].some((key) =>
+          parsed.searchParams.has(key),
+        )
+      ) {
         throw new Error();
       }
     } catch {
-      throw new Error('Set DATABASE_URL to your PostgreSQL connection URI in .env. Replace placeholders, URL-encode the password, and remove SSL query parameters; use DB_SSL and DB_SSL_CA_PATH instead.');
+      throw new Error(
+        'Set DATABASE_URL to your PostgreSQL connection URI in .env. Replace placeholders, URL-encode the password, and remove SSL query parameters; use DB_SSL and DB_SSL_CA_PATH instead.',
+      );
     }
   }
 
@@ -40,10 +49,12 @@ export function getDatabaseConfig(env: NodeJS.ProcessEnv = process.env): {
     pool: { max: 5, min: 0, acquire: 30000, idle: 10000 },
     dialectOptions: {
       connectionTimeoutMillis: 10000,
-      ssl: sslEnabled ? {
-        rejectUnauthorized: true,
-        ...(caPath ? { ca: fs.readFileSync(caPath, 'utf8') } : {}),
-      } : false,
+      ssl: sslEnabled
+        ? {
+            rejectUnauthorized: true,
+            ...(caPath ? { ca: fs.readFileSync(caPath, 'utf8') } : {}),
+          }
+        : false,
     },
   };
 
