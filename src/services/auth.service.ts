@@ -1,3 +1,12 @@
+import {
+  addOwnerMembership,
+  listMemberships,
+  resolveMembership,
+} from './membership.service';
+import { requireWorkspaceWrite } from './workspace-access.service';
+import { WorkspaceMembership } from '../models/workspace-membership.model';
+import sequelize from '../config/database';
+import { Transaction } from 'sequelize';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/user.model';
@@ -6,125 +15,149 @@ import { Workspace } from '../models/workspace.model';
 import { Branch } from '../models/branch.model';
 import { WorkspaceSetting } from '../models/workspace-setting.model';
 import { StudentProfile } from '../models/student-profile.model';
-import { BadRequestException, UnauthorizedException, ForbiddenException } from '../middlewares/error.middleware';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'studyflow_secret_key_12345';
-
+import {
+  BadRequestException,
+  UnauthorizedException,
+  ForbiddenException,
+  HttpException,
+} from '../middlewares/error.middleware';
+import { getJwtSecret } from '../config/auth';
 export class AuthService {
-  async register(data: any) {
-    const existingUser = await User.findOne({ where: { email: data.email } });
+  async register(data: any, transaction?: Transaction): Promise<any> {
+    if (!transaction)
+      return sequelize.transaction((t) => this.register(data, t));
+    const existingUser = await User.findOne({
+      ...{ where: { email: data.email } },
+      transaction,
+    });
     if (existingUser) {
       throw new BadRequestException('Email already registered');
     }
-
     // Hash password
     const hashedPassword = await bcrypt.hash(data.password, 10);
-
     // Automatically generate a unique subdomain from the workspace name
-    const baseSubdomain = data.workspaceName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'workspace';
+    const baseSubdomain =
+      data.workspaceName
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '') || 'workspace';
     let subdomain = baseSubdomain;
     let counter = 1;
-    while (await Workspace.findOne({ where: { subdomain } })) {
+    while (
+      await Workspace.findOne({ ...{ where: { subdomain } }, transaction })
+    ) {
       subdomain = `${baseSubdomain}-${counter}`;
       counter++;
     }
-
-    const workspace = await Workspace.create({
-      name: data.workspaceName,
-      subdomain,
-      address: data.address,
-      logo: data.logo || null,
-      gstNumber: data.gstNumber || null,
-      pincode: data.pincode || null,
-    } as any);
-
+    const workspace = await Workspace.create(
+      {
+        name: data.workspaceName,
+        subdomain,
+        address: data.address,
+        logo: data.logo || null,
+        gstNumber: data.gstNumber || null,
+        pincode: data.pincode || null,
+      } as any,
+      { transaction },
+    );
     // Create default branch
-    const branch = await Branch.create({
-      workspaceId: workspace.id,
-      name: 'Main Branch',
-      address: data.address,
-    } as any);
-
+    const branch = await Branch.create(
+      {
+        workspaceId: workspace.id,
+        name: 'Main Branch',
+        address: data.address,
+      } as any,
+      { transaction },
+    );
     // Create Workspace settings
-    await WorkspaceSetting.create({
-      workspaceId: workspace.id,
-      themeColor: '#2563EB',
-    } as any);
-
+    await WorkspaceSetting.create(
+      {
+        workspaceId: workspace.id,
+        themeColor: '#2563EB',
+      } as any,
+      { transaction },
+    );
     // Create User (Workspace Owner)
-    const user = await User.create({
-      email: data.email,
-      password: hashedPassword,
-      name: data.name,
-      mobile: data.mobile || null,
-      role: 'OWNER',
-      workspaceId: workspace.id,
-      branchId: branch.id,
-    } as any);
-
+    const user = await User.create(
+      {
+        email: data.email,
+        password: hashedPassword,
+        name: data.name,
+        mobile: data.mobile || null,
+        role: 'OWNER',
+        workspaceId: workspace.id,
+        branchId: branch.id,
+      } as any,
+      { transaction },
+    );
+    await addOwnerMembership(user.id, workspace.id, transaction);
     const userWithWorkspace = await User.findByPk(user.id, {
-      include: [Workspace]
+      ...{
+        include: [Workspace],
+      },
+      transaction,
     });
-
-    return this.generateTokenResponse(userWithWorkspace!);
+    return this.generateTokenResponse(
+      userWithWorkspace!,
+      workspace.id,
+      transaction,
+    );
   }
-
   async login(data: any) {
-    const user = await User.findOne({ 
+    const user = await User.findOne({
       where: { email: data.email },
-      include: [Workspace]
+      include: [Workspace],
     });
     if (!user) {
       throw new UnauthorizedException('Invalid email or password');
     }
-
-    if (user.role !== 'SUPER_ADMIN' && user.workspace && !user.workspace.isActive) {
-      throw new ForbiddenException('Your workspace is disabled. Access denied.');
-    }
-
-    const isMatch = await bcrypt.compare(data.password, user.password);
+    const isMatch =
+      typeof data.password === 'string' && user.password
+        ? await bcrypt.compare(data.password, user.password)
+        : false;
     if (!isMatch) {
       throw new UnauthorizedException('Invalid email or password');
     }
-
-    return this.generateTokenResponse(user);
+    return this.generateTokenResponse(user, data.workspaceId);
   }
-
-  async requestOtp(mobile: string) {
-    const user = await User.findOne({ where: { mobile } });
-    if (!user) {
-      throw new BadRequestException('Mobile number not registered');
-    }
-    // Mock OTP dispatch
-    console.log(`[OTP] Generated OTP 123456 for mobile: ${mobile}`);
-    return { message: 'OTP sent successfully (Mock: 123456)' };
+  async requestOtp(_mobile: string) {
+    throw new HttpException(
+      503,
+      'OTP login is unavailable until an SMS verification provider is configured.',
+    );
   }
-
-  async verifyOtp(mobile: string, otp: string) {
-    const user = await User.findOne({ 
-      where: { mobile },
-      include: [Workspace]
-    });
-    if (!user) {
-      throw new BadRequestException('Mobile number not registered');
-    }
-
-    if (user.role !== 'SUPER_ADMIN' && user.workspace && !user.workspace.isActive) {
-      throw new ForbiddenException('Your workspace is disabled. Access denied.');
-    }
-
-    if (otp !== '123456') {
-      throw new UnauthorizedException('Invalid OTP');
-    }
-
-    return this.generateTokenResponse(user);
+  async verifyOtp(_mobile: string, _otp: string) {
+    throw new HttpException(
+      503,
+      'OTP login is unavailable until an SMS verification provider is configured.',
+    );
   }
-
-  private generateTokenResponse(user: User) {
-    const payload = { sub: user.id, email: user.email, role: user.role, workspaceId: user.workspaceId };
+  async generateTokenResponse(
+    user: User,
+    workspaceId?: string,
+    transaction?: Transaction,
+  ) {
+    const memberships = await listMemberships(user.id, transaction);
+    await resolveMembership(user, workspaceId, undefined, transaction);
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      workspaceId: user.workspaceId,
+    };
     return {
-      accessToken: jwt.sign(payload, JWT_SECRET, { expiresIn: '1d' }),
-      refreshToken: jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' }),
+      memberships,
+      accessToken: jwt.sign(
+        { ...payload, tokenUse: 'access' },
+        getJwtSecret(),
+        { expiresIn: '1d', algorithm: 'HS256' },
+      ),
+      refreshToken: jwt.sign(
+        { ...payload, tokenUse: 'refresh' },
+        getJwtSecret(),
+        { expiresIn: '7d', algorithm: 'HS256' },
+      ),
       user: {
         id: user.id,
         email: user.email,
@@ -132,25 +165,30 @@ export class AuthService {
         role: user.role,
         workspaceId: user.workspaceId,
         branchId: user.branchId,
-        workspace: user.workspace ? {
-          id: user.workspace.id,
-          name: user.workspace.name,
-          address: user.workspace.address,
-          pincode: user.workspace.pincode,
-          gstNumber: user.workspace.gstNumber,
-          subdomain: user.workspace.subdomain,
-          logo: user.workspace.logo
-        } : null
+        workspace: user.workspace
+          ? {
+              id: user.workspace.id,
+              name: user.workspace.name,
+              address: user.workspace.address,
+              pincode: user.workspace.pincode,
+              gstNumber: user.workspace.gstNumber,
+              subdomain: user.workspace.subdomain,
+              logo: user.workspace.logo,
+            }
+          : null,
       },
     };
   }
-
-  async updateFcmToken(userId: string, fcmToken: string, deviceType?: string, deviceName?: string) {
+  async updateFcmToken(
+    userId: string,
+    fcmToken: string,
+    deviceType?: string,
+    deviceName?: string,
+  ) {
     const user = await User.findByPk(userId);
     if (!user) {
       throw new BadRequestException('User not found');
     }
-
     // Upsert: find existing device with this token, or create a new one
     const [device] = await UserDevice.findOrCreate({
       where: { userId, fcmToken },
@@ -161,27 +199,24 @@ export class AuthService {
         deviceName: deviceName || null,
       } as any,
     });
-
     return device;
   }
-
-  async getProfile(userId: string) {
+  async getProfile(userId: string, workspaceId?: string) {
     const user = await User.findByPk(userId, {
       attributes: { exclude: ['password'] },
-      include: [Workspace]
+      include: [Workspace],
     });
     if (!user) {
       throw new BadRequestException('User not found');
     }
-    return user;
+    await resolveMembership(user, workspaceId);
+    return { ...user.toJSON(), memberships: await listMemberships(userId) };
   }
-
-  async updateProfile(userId: string, data: any) {
+  async updateProfile(userId: string, data: any, workspaceId?: string) {
     const user = await User.findByPk(userId, { include: [Workspace] });
     if (!user) {
       throw new BadRequestException('User not found');
     }
-
     const updateData: any = {};
     if (data.name !== undefined) updateData.name = data.name;
     if (data.email !== undefined) {
@@ -195,82 +230,76 @@ export class AuthService {
     }
     if (data.mobile !== undefined) updateData.mobile = data.mobile;
     if (data.avatar !== undefined) updateData.avatar = data.avatar;
-
     if (data.password) {
       updateData.password = await bcrypt.hash(data.password, 10);
     }
-
     await user.update(updateData);
-
-    // Update Workspace details if provided
-    if (user.workspace) {
-      const wsUpdate: any = {};
-      if (data.workspaceName !== undefined) wsUpdate.name = data.workspaceName;
-      if (data.address !== undefined) wsUpdate.address = data.address;
-      if (data.gstNumber !== undefined) wsUpdate.gstNumber = data.gstNumber;
-      if (data.pincode !== undefined) wsUpdate.pincode = data.pincode;
-      if (data.logo !== undefined) wsUpdate.logo = data.logo;
-
-      if (Object.keys(wsUpdate).length > 0) {
-        await user.workspace.update(wsUpdate);
-      }
+    const workspaceFields = [
+      'workspaceName',
+      'address',
+      'gstNumber',
+      'pincode',
+      'logo',
+    ];
+    if (workspaceFields.some((key) => data[key] !== undefined)) {
+      const membership = await WorkspaceMembership.findOne({
+        where: { userId, workspaceId, role: 'OWNER', status: 'ACTIVE' },
+      });
+      if (!membership)
+        throw new ForbiddenException(
+          'Only the library owner can change its details',
+        );
+      await requireWorkspaceWrite(membership.workspaceId);
+      const workspace = await Workspace.findByPk(membership.workspaceId);
+      if (!workspace) throw new BadRequestException('Library not found');
+      const values: any = {};
+      for (const key of workspaceFields)
+        if (data[key] !== undefined)
+          values[key === 'workspaceName' ? 'name' : key] = data[key];
+      await workspace.update(values);
     }
-    
-    // Fetch fresh user record with workspace info
-    const freshUser = await User.findByPk(userId, { include: [Workspace] });
-    return {
-      id: freshUser!.id,
-      email: freshUser!.email,
-      name: freshUser!.name,
-      role: freshUser!.role,
-      workspaceId: freshUser!.workspaceId,
-      branchId: freshUser!.branchId,
-      mobile: freshUser!.mobile,
-      avatar: freshUser!.avatar,
-      workspace: freshUser!.workspace ? {
-        id: freshUser!.workspace.id,
-        name: freshUser!.workspace.name,
-        address: freshUser!.workspace.address,
-        gstNumber: freshUser!.workspace.gstNumber,
-        pincode: freshUser!.workspace.pincode,
-        subdomain: freshUser!.workspace.subdomain,
-        logo: freshUser!.workspace.logo
-      } : null
-    };
+    return this.getProfile(userId, workspaceId);
   }
-
   async googleLogin(idToken: string) {
-    let googlePayload: any;
-    if (idToken.startsWith('mock-token-')) {
-      try {
-        const parts = idToken.replace('mock-token-', '').split('.');
-        const payloadJson = Buffer.from(parts[1], 'base64').toString('utf-8');
-        googlePayload = JSON.parse(payloadJson);
-      } catch (err) {
-        throw new UnauthorizedException('Invalid mock token format');
-      }
-    } else {
-      try {
-        const verifyRes = await (globalThis as any).fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`);
-        googlePayload = await verifyRes.json();
-        if (googlePayload.error_description) {
-          throw new Error(googlePayload.error_description);
-        }
-      } catch (err: any) {
-        throw new UnauthorizedException(err.message || 'Google token validation failed');
-      }
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    if (!clientId)
+      throw new HttpException(503, 'Google login is not configured.');
+    if (typeof idToken !== 'string' || idToken.startsWith('mock-token-')) {
+      throw new UnauthorizedException('Invalid Google token');
     }
-
+    let googlePayload: any;
+    try {
+      const response = await fetch(
+        `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`,
+        {
+          signal: AbortSignal.timeout(10000),
+        },
+      );
+      googlePayload = await response.json();
+      if (
+        !response.ok ||
+        googlePayload.aud !== clientId ||
+        !['accounts.google.com', 'https://accounts.google.com'].includes(
+          googlePayload.iss,
+        ) ||
+        ![true, 'true'].includes(googlePayload.email_verified) ||
+        Number(googlePayload.exp) <= Date.now() / 1000 ||
+        !Number.isFinite(Number(googlePayload.exp)) ||
+        typeof googlePayload.sub !== 'string'
+      ) {
+        throw new Error('Invalid token');
+      }
+    } catch {
+      throw new UnauthorizedException('Google token validation failed');
+    }
     const { email, name, sub: googleId } = googlePayload;
     if (!email) {
       throw new BadRequestException('Email address not provided by Google');
     }
-
     let user = await User.findOne({
       where: { email },
-      include: [Workspace]
+      include: [Workspace],
     });
-
     if (!user) {
       // Register new user (Owner role, workspaceId is null initially)
       user = await User.create({
@@ -279,71 +308,97 @@ export class AuthService {
         googleId,
         role: 'OWNER',
       } as any);
+    } else if (user.googleId && user.googleId !== googleId) {
+      throw new UnauthorizedException('Google account does not match');
     } else if (!user.googleId) {
-      // Link Google Account to existing email
+      if (!email.endsWith('@gmail.com') && !googlePayload.hd) {
+        throw new UnauthorizedException(
+          'Sign in with your password before linking this Google account',
+        );
+      }
+      // Link only when Google is authoritative for this email
       await user.update({ googleId });
     }
-
-    const tokenResponse = this.generateTokenResponse(user);
+    const tokenResponse = await this.generateTokenResponse(user);
     return {
       ...tokenResponse,
-      requiresWorkspaceInfo: !user.workspaceId,
+      requiresWorkspaceInfo: tokenResponse.memberships.length === 0,
     };
   }
-
-  async setupWorkspace(userId: string, data: any) {
-    const user = await User.findByPk(userId);
+  async setupWorkspace(
+    userId: string,
+    data: any,
+    transaction?: Transaction,
+  ): Promise<any> {
+    if (!transaction)
+      return sequelize.transaction((t) => this.setupWorkspace(userId, data, t));
+    const user = await User.findByPk(userId, { transaction });
     if (!user) {
       throw new BadRequestException('User not found');
     }
 
-    if (user.workspaceId) {
-      throw new BadRequestException('User already has a registered workspace');
-    }
-
     // Generate unique subdomain
-    const baseSubdomain = data.workspaceName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'workspace';
+    const baseSubdomain =
+      data.workspaceName
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '') || 'workspace';
     let subdomain = baseSubdomain;
     let counter = 1;
-    while (await Workspace.findOne({ where: { subdomain } })) {
+    while (
+      await Workspace.findOne({ ...{ where: { subdomain } }, transaction })
+    ) {
       subdomain = `${baseSubdomain}-${counter}`;
       counter++;
     }
-
     // Create Workspace
-    const workspace = await Workspace.create({
-      name: data.workspaceName,
-      subdomain,
-      address: data.address,
-      pincode: data.pincode || null,
-      gstNumber: data.gstNumber || null,
-      logo: data.logo || null,
-    } as any);
-
+    const workspace = await Workspace.create(
+      {
+        name: data.workspaceName,
+        subdomain,
+        address: data.address,
+        pincode: data.pincode || null,
+        gstNumber: data.gstNumber || null,
+        logo: data.logo || null,
+      } as any,
+      { transaction },
+    );
     // Create default branch
-    const branch = await Branch.create({
-      workspaceId: workspace.id,
-      name: 'Main Branch',
-      address: data.address,
-    } as any);
-
+    const branch = await Branch.create(
+      {
+        workspaceId: workspace.id,
+        name: 'Main Branch',
+        address: data.address,
+      } as any,
+      { transaction },
+    );
     // Create default settings
-    await WorkspaceSetting.create({
-      workspaceId: workspace.id,
-      themeColor: '#2563EB',
-    } as any);
-
+    await WorkspaceSetting.create(
+      {
+        workspaceId: workspace.id,
+        themeColor: '#2563EB',
+      } as any,
+      { transaction },
+    );
+    await addOwnerMembership(user.id, workspace.id, transaction);
+    // Legacy default only; permissions now come from membership.
     // Link user to workspace & branch
-    await user.update({
-      workspaceId: workspace.id,
-      branchId: branch.id,
-    });
-
+    if (!user.workspaceId)
+      await user.update(
+        {
+          workspaceId: workspace.id,
+          branchId: branch.id,
+        },
+        { transaction },
+      );
     // Fetch user with inclusion
     const updatedUser = await User.findByPk(userId, {
-      include: [Workspace]
+      ...{
+        include: [Workspace],
+      },
+      transaction,
     });
-
-    return this.generateTokenResponse(updatedUser!);
+    return this.generateTokenResponse(updatedUser!, workspace.id, transaction);
   }
 }

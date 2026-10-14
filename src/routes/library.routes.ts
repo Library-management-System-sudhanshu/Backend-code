@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import { LibraryController } from '../controllers/library.controller';
 import { authenticateJWT, requireRoles } from '../middlewares/auth.middleware';
-import { tenantIsolation } from '../middlewares/tenant.middleware';
+import {
+  tenantIsolation,
+  resourceAccess,
+} from '../middlewares/tenant.middleware';
 
 const router = Router();
 const controller = new LibraryController();
@@ -12,58 +15,66 @@ router.get(
   '/books',
   requireRoles('OWNER', 'MANAGER', 'STAFF', 'STUDENT'),
   tenantIsolation,
-  (req, res, next) => controller.listBooks(req, res, next)
+  (req, res, next) => controller.listBooks(req, res, next),
 );
 
 router.post(
   '/books',
-  requireRoles('OWNER', 'MANAGER', 'STAFF'),
+  requireRoles('OWNER'),
   tenantIsolation,
-  (req, res, next) => controller.createBook(req, res, next)
+  (req, res, next) => controller.createBook(req, res, next),
 );
 
 router.patch(
   '/books/:id',
-  requireRoles('OWNER', 'MANAGER', 'STAFF'),
-  (req, res, next) => controller.updateBook(req, res, next)
+  requireRoles('OWNER'),
+  tenantIsolation,
+  resourceAccess('book', 'id'),
+  (req, res, next) => controller.updateBook(req, res, next),
 );
 
 router.delete(
   '/books/:id',
-  requireRoles('OWNER', 'MANAGER', 'STAFF'),
-  (req, res, next) => controller.deleteBook(req, res, next)
+  requireRoles('OWNER'),
+  tenantIsolation,
+  resourceAccess('book', 'id'),
+  (req, res, next) => controller.deleteBook(req, res, next),
 );
 
 router.post(
   '/books/issue',
   requireRoles('OWNER', 'MANAGER', 'STAFF'),
   tenantIsolation,
-  (req, res, next) => controller.issueBook(req, res, next)
+  (req, res, next) => controller.issueBook(req, res, next),
 );
 
 router.post(
   '/books/return/:issueId',
   requireRoles('OWNER', 'MANAGER', 'STAFF'),
-  (req, res, next) => controller.returnBook(req, res, next)
+  tenantIsolation,
+  resourceAccess('issue', 'issueId'),
+  (req, res, next) => controller.returnBook(req, res, next),
 );
 
 router.get(
   '/books/issued',
   requireRoles('OWNER', 'MANAGER', 'STAFF'),
   tenantIsolation,
-  (req, res, next) => controller.getIssuedBooks(req, res, next)
+  (req, res, next) => controller.getIssuedBooks(req, res, next),
 );
 
 router.get(
   '/books/student/:studentProfileId',
   requireRoles('STUDENT', 'OWNER', 'MANAGER', 'STAFF'),
-  (req, res, next) => controller.getStudentIssuedBooks(req, res, next)
+  tenantIsolation,
+  (req, res, next) => controller.getStudentIssuedBooks(req, res, next),
 );
 
 router.post(
   '/books/request',
   requireRoles('STUDENT', 'OWNER', 'MANAGER', 'STAFF'),
-  (req, res, next) => controller.requestBook(req, res, next)
+  tenantIsolation,
+  (req, res, next) => controller.requestBook(req, res, next),
 );
 
 export default router;

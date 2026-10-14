@@ -4,6 +4,10 @@ import apiRouter from './routes';
 import { errorHandler } from './middlewares/error.middleware';
 
 const app = express();
+// Also redact nested Sequelize associations, which may bypass User.toJSON().
+app.set('json replacer', (key: string, value: unknown) =>
+  ['password', 'googleId'].includes(key) ? undefined : value,
+);
 
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ limit: '2mb', extended: true }));
@@ -31,8 +35,14 @@ app.use((req, res, next) => {
   if (ALLOWED_ORIGINS.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
   }
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader(
+    'Access-Control-Allow-Methods',
+    'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+  );
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'Content-Type, Authorization, X-Workspace-Id, X-Branch-Id',
+  );
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   if (req.method === 'OPTIONS') {
     res.sendStatus(200);

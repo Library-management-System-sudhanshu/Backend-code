@@ -1,8 +1,22 @@
-import { Table, Column, Model, DataType, ForeignKey, BelongsTo, Index } from 'sequelize-typescript';
+import {
+  Table,
+  Column,
+  Model,
+  DataType,
+  ForeignKey,
+  BelongsTo,
+  Index,
+} from 'sequelize-typescript';
 import { Workspace } from './workspace.model';
 import { SaaSPlan } from './saas-plan.model';
 
-@Table({ tableName: 'workspace_subscriptions', paranoid: true })
+@Table({
+  tableName: 'workspace_subscriptions',
+  paranoid: true,
+  indexes: [
+    { unique: true, fields: ['workspaceId'], where: { deletedAt: null } },
+  ],
+})
 export class WorkspaceSubscription extends Model<WorkspaceSubscription> {
   @Column({
     type: DataType.UUID,
@@ -27,9 +41,9 @@ export class WorkspaceSubscription extends Model<WorkspaceSubscription> {
   @BelongsTo(() => SaaSPlan, { onDelete: 'SET NULL' })
   saasPlan: SaaSPlan;
 
-  @Column({ 
-    type: DataType.ENUM('TRIAL', 'ACTIVE', 'EXPIRED', 'CANCELLED'), 
-    allowNull: false 
+  @Column({
+    type: DataType.ENUM('TRIAL', 'ACTIVE', 'EXPIRED', 'CANCELLED'),
+    allowNull: false,
   })
   status: string;
 

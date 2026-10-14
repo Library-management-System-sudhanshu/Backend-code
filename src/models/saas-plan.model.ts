@@ -12,6 +12,9 @@ export class SaaSPlan extends Model<SaaSPlan> {
   @Column({ type: DataType.STRING, allowNull: false })
   name: string;
 
+  @Column({ type: DataType.INTEGER, allowNull: false, defaultValue: 30 })
+  durationDays: number;
+
   @Column({ type: DataType.DECIMAL(10, 2), allowNull: false })
   price: number;
 

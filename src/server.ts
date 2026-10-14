@@ -3,17 +3,19 @@ dotenv.config();
 
 import app from './app';
 import sequelize from './config/database';
+import { getJwtSecret } from './config/auth';
 import { CronService } from './services/cron.service';
 
 const PORT = process.env.PORT || 3000;
 
 async function startServer() {
   try {
+    getJwtSecret();
     // Authenticate database connection
     await sequelize.authenticate();
     console.log('[Database] Connection has been established successfully.');
 
-    if (process.env.DB_SYNC !== 'false') {
+    if (process.env.DB_SYNC === 'true') {
       // Pre-sync cleanup for Postgres enum default casting issue when altering string columns to enum
       try {
         await sequelize.query(`
@@ -43,7 +45,7 @@ async function startServer() {
         console.warn('[Database Pre-Sync Warning]', e);
       }
 
-      await sequelize.sync();
+      await sequelize.sync({ alter: true });
       console.log('[Database] Models synchronized successfully.');
     } else {
       console.log('[Database] Startup schema synchronization disabled.');
@@ -56,10 +58,15 @@ async function startServer() {
 
     // Start Express server
     app.listen(PORT, () => {
-      console.log(`[StudyFlow Backend] Server running on http://localhost:${PORT}/api`);
+      console.log(
+        `[StudyFlow Backend] Server running on http://localhost:${PORT}/api`,
+      );
     });
   } catch (error) {
-    console.error('[Server] Unable to connect to the database or start server:', error);
+    console.error(
+      '[Server] Unable to connect to the database or start server:',
+      error,
+    );
     process.exit(1);
   }
 }

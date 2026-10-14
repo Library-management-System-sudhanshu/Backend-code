@@ -1,36 +1,40 @@
 import { Router } from 'express';
 import { ComplaintController } from '../controllers/complaint.controller';
 import { authenticateJWT, requireRoles } from '../middlewares/auth.middleware';
-import { tenantIsolation } from '../middlewares/tenant.middleware';
+import {
+  tenantIsolation,
+  resourceAccess,
+} from '../middlewares/tenant.middleware';
 
 const router = Router();
 const controller = new ComplaintController();
 
 router.use(authenticateJWT);
 
-router.post(
-  '/',
-  requireRoles('STUDENT'),
-  (req, res, next) => controller.createComplaint(req, res, next)
+router.post('/', requireRoles('STUDENT'), tenantIsolation, (req, res, next) =>
+  controller.createComplaint(req, res, next),
 );
 
 router.get(
   '/',
   requireRoles('OWNER', 'MANAGER', 'STAFF'),
   tenantIsolation,
-  (req, res, next) => controller.getWorkspaceComplaints(req, res, next)
+  (req, res, next) => controller.getWorkspaceComplaints(req, res, next),
 );
 
 router.patch(
   '/:id',
   requireRoles('OWNER', 'MANAGER', 'STAFF'),
-  (req, res, next) => controller.updateComplaintStatus(req, res, next)
+  tenantIsolation,
+  resourceAccess('complaint', 'id'),
+  (req, res, next) => controller.updateComplaintStatus(req, res, next),
 );
 
 router.get(
   '/student/:studentProfileId',
   requireRoles('STUDENT', 'OWNER', 'MANAGER', 'STAFF'),
-  (req, res, next) => controller.getStudentComplaints(req, res, next)
+  tenantIsolation,
+  (req, res, next) => controller.getStudentComplaints(req, res, next),
 );
 
 export default router;

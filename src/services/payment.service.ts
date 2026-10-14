@@ -1,334 +1,324 @@
 import { Payment, PaymentMethod, PaymentStatus } from '../models/payment.model';
 import { StudentProfile } from '../models/student-profile.model';
-import { StudentSubscription, SubscriptionStatus } from '../models/student-subscription.model';
+import {
+  StudentSubscription,
+  SubscriptionStatus,
+} from '../models/student-subscription.model';
 import { SubscriptionPlan } from '../models/subscription-plan.model';
 import { User } from '../models/user.model';
 import { Shift } from '../models/shift.model';
-import { Op } from 'sequelize';
-import { NotFoundException } from '../middlewares/error.middleware';
-import crypto from 'crypto';
+import { Op, Transaction } from 'sequelize';
+import {
+  BadRequestException,
+  NotFoundException,
+} from '../middlewares/error.middleware';
+import { createOrder, money, verifyCapturedPayment } from './razorpay';
+import sequelize from '../config/database';
+import crypto from 'node:crypto';
 
 export class PaymentService {
-  async createPayment(data: any) {
-    const { studentProfileId, amount, method, subscriptionPlanId, shiftId, totalAmount } = data;
-
-    const student = await StudentProfile.findByPk(studentProfileId);
+  async createPayment(data: any, allowPartial = false) {
+    const amount = money(data.amount);
+    if (!Object.values(PaymentMethod).includes(data.method))
+      throw new BadRequestException('Invalid payment method');
+    const student = await StudentProfile.findByPk(data.studentProfileId);
     if (!student) throw new NotFoundException('Student profile not found');
-
-    let targetPlanId = subscriptionPlanId;
-    let finalTotalAmount = totalAmount !== undefined ? Number(totalAmount) : amount;
-
-    if (shiftId) {
-      const shift = await Shift.findByPk(shiftId);
-      if (shift) {
-        const user = await User.findByPk(student.userId);
-        if (user) {
-          const durationMonths = data.durationMonths ? Number(data.durationMonths) : 1;
-          const durationDays = durationMonths * 30;
-          
-          let planName = `${shift.name} Plan`;
-          let expectedPrice = shift.price || 0;
-          if (durationMonths === 3) {
-            planName = `${shift.name} 3-Month Plan`;
-            expectedPrice = shift.price3Months || (shift.price * 3);
-          } else if (durationMonths === 6) {
-            planName = `${shift.name} 6-Month Plan`;
-            expectedPrice = shift.price6Months || (shift.price * 6);
-          } else if (durationMonths !== 1) {
-            planName = `${shift.name} Plan - ${durationMonths} Months`;
-            expectedPrice = shift.price * durationMonths;
-          }
-
-          let plan = await SubscriptionPlan.findOne({
-            where: {
-              name: planName,
-              workspaceId: user.workspaceId,
-              durationDays,
-            },
-          });
-          if (!plan) {
-            plan = await SubscriptionPlan.create({
-              name: planName,
-              workspaceId: user.workspaceId,
-              price: expectedPrice,
-              durationDays,
-              isActive: true,
-            } as any);
-          } else {
-            if (plan.price !== expectedPrice) {
-              await plan.update({ price: expectedPrice });
-            }
-          }
-          targetPlanId = plan.id;
-          finalTotalAmount = expectedPrice;
-        }
-      }
-    } else if (subscriptionPlanId) {
-      const plan = await SubscriptionPlan.findByPk(subscriptionPlanId);
-      if (plan) {
-        finalTotalAmount = plan.price;
-      }
+    let plan: SubscriptionPlan | null = null;
+    if (data.subscriptionPlanId) {
+      plan = await SubscriptionPlan.findOne({
+        where: {
+          id: data.subscriptionPlanId,
+          workspaceId: student.workspaceId,
+          isActive: true,
+        },
+      });
+      if (!plan) throw new BadRequestException('Invalid subscription plan');
+    } else if (data.shiftId) {
+      const shift = await Shift.findOne({
+        where: { id: data.shiftId, workspaceId: student.workspaceId },
+      });
+      if (!shift) throw new BadRequestException('Invalid shift');
+      const months = Number(data.durationMonths ?? 1);
+      if (!Number.isInteger(months) || months < 1 || months > 24)
+        throw new BadRequestException('Invalid duration');
+      const price =
+        months === 3
+          ? (shift.price3Months ?? Number(shift.price) * 3)
+          : months === 6
+            ? (shift.price6Months ?? Number(shift.price) * 6)
+            : Number(shift.price) * months;
+      // Include price in the generated name so a new price never mutates historical terms.
+      const name = `${shift.name} ${months}-Month Plan (${money(price)} INR)`;
+      [plan] = await SubscriptionPlan.findOrCreate({
+        where: { workspaceId: student.workspaceId, name },
+        defaults: {
+          workspaceId: student.workspaceId,
+          name,
+          price,
+          durationDays: months * 30,
+          isActive: true,
+        } as any,
+      });
     }
-
-    const discountAmount = data.discountAmount ? Number(data.discountAmount) : 0;
-    const dueAmount = Math.max(0, finalTotalAmount - amount - discountAmount);
-    if (dueAmount > 0) {
-      student.dueAmount = Number(student.dueAmount || 0) + dueAmount;
-      await student.save();
+    const totalAmount = money(
+      plan ? plan.price : (data.totalAmount ?? amount),
+      'Total amount',
+    );
+    const discountAmount = money(data.discountAmount ?? 0, 'Discount', true);
+    if (
+      discountAmount > totalAmount ||
+      amount > totalAmount - discountAmount + 0.00001
+    ) {
+      throw new BadRequestException(
+        'Payment and discount exceed the total amount',
+      );
     }
-
-    const payment = await Payment.create({
-      workspaceId: student.workspaceId,
-      branchId: student.branchId,
-      studentProfileId,
-      amount,
-      method,
-      subscriptionPlanId: targetPlanId || null,
-      status: method === 'CASH'
-        ? (dueAmount > 0 ? PaymentStatus.PARTIAL : PaymentStatus.PAID)
-        : PaymentStatus.UNPAID, // Cash payments are direct
-      paidAt: method === 'CASH' ? new Date() : null,
-      transactionId: method === 'CASH' ? `CASH-${Date.now()}` : null,
-      invoiceUrl: `https://studyflow-receipts.s3.amazonaws.com/invoice_${Date.now()}.pdf`,
-      dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days due
-    } as any);
-
-    // If it's a cash payment, directly activate the subscription
-    if (method === 'CASH' && targetPlanId) {
-      await this.activateSubscription(studentProfileId, targetPlanId);
+    if (
+      !allowPartial &&
+      Math.round(amount * 100) !==
+        Math.round((totalAmount - discountAmount) * 100)
+    ) {
+      throw new BadRequestException(
+        'Student online payments must cover the full plan amount',
+      );
     }
-
-    // Razorpay Integration
-    if (method === 'RAZORPAY') {
-      try {
-        const keyId = process.env.RAZORPAY_KEY_ID || 'rzp_test_T9hh97PsK4bGuG';
-        const keySecret = process.env.RAZORPAY_KEY_SECRET || 'aL02SqOqMzSQP7XwCZm9fnfo';
-        const auth = Buffer.from(`${keyId}:${keySecret}`).toString('base64');
-
-        const response = await fetch('https://api.razorpay.com/v1/orders', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Basic ${auth}`
-          },
-          body: JSON.stringify({
-            amount: Math.round(amount * 100), // in paise
-            currency: 'INR',
-            receipt: payment.id
-          })
-        });
-
-        if (!response.ok) {
-          const errData = await response.json();
-          console.error('[Razorpay Order Creation Error]:', errData);
-          throw new Error('Failed to create Razorpay order');
-        }
-
-        const razorpayOrder = await response.json() as any;
-
-        await payment.update({ transactionId: razorpayOrder.id });
-
-        return {
-          payment,
-          razorpayOrder: {
-            id: razorpayOrder.id,
-            amount: razorpayOrder.amount,
-            currency: razorpayOrder.currency,
-          },
-        };
-      } catch (err: any) {
-        console.error('[Payment Service Error] Razorpay creation failed, falling back to mock:', err);
-        return {
-          payment,
-          razorpayOrder: {
-            id: `order_${Math.random().toString(36).substring(2, 11)}`,
-            amount: amount * 100, // in paisa
-            currency: 'INR',
-          },
-        };
-      }
+    const payment = await sequelize.transaction(async (transaction) => {
+      const row = await Payment.create(
+        {
+          workspaceId: student.workspaceId,
+          branchId: student.branchId,
+          studentProfileId: student.id,
+          amount,
+          totalAmount,
+          discountAmount,
+          method: data.method,
+          subscriptionPlanId: plan?.id ?? null,
+          status: PaymentStatus.UNPAID,
+          dueDate: new Date(Date.now() + 7 * 86400000),
+        } as any,
+        { transaction },
+      );
+      if (data.method === PaymentMethod.CASH)
+        await this.settle(row, `CASH-${crypto.randomUUID()}`, transaction);
+      return row;
+    });
+    if (data.method === PaymentMethod.RAZORPAY) {
+      // Failed provider calls leave a pending record; they never return a fabricated order or grant access.
+      const order = await createOrder(amount, payment.id);
+      await payment.update({ orderId: order.id, transactionId: order.id });
+      return {
+        payment,
+        razorpayOrder: {
+          id: order.id,
+          amount: order.amount,
+          currency: order.currency,
+        },
+      };
     }
-
     return { payment };
   }
 
-  async verifyRazorpay(paymentId: string, transactionId: string, body?: any) {
+  async verifyRazorpay(
+    paymentId: string,
+    transactionId: string,
+    body: any = {},
+  ) {
     const payment = await Payment.findByPk(paymentId);
     if (!payment) throw new NotFoundException('Payment record not found');
-
-    if (body?.razorpay_signature && body?.razorpay_order_id) {
-      const keySecret = process.env.RAZORPAY_KEY_SECRET || 'aL02SqOqMzSQP7XwCZm9fnfo';
-      const hmac = crypto.createHmac('sha256', keySecret);
-      hmac.update(`${body.razorpay_order_id}|${transactionId}`);
-      const generatedSignature = hmac.digest('hex');
-
-      if (generatedSignature !== body.razorpay_signature) {
-        throw new Error('Invalid Razorpay signature');
-      }
+    const providerId = body.razorpay_payment_id || transactionId;
+    if (
+      transactionId &&
+      body.razorpay_payment_id &&
+      transactionId !== body.razorpay_payment_id
+    ) {
+      throw new BadRequestException('Conflicting payment IDs');
     }
-
-    let isPartial = false;
-    if (payment.subscriptionPlanId) {
-      const plan = await SubscriptionPlan.findByPk(payment.subscriptionPlanId);
-      if (plan && Number(payment.amount) < Number(plan.price)) {
-        isPartial = true;
-      }
+    if (
+      payment.method !== PaymentMethod.RAZORPAY ||
+      !payment.orderId ||
+      body.razorpay_order_id !== payment.orderId
+    ) {
+      throw new BadRequestException('Payment order does not match this record');
     }
-
-    await payment.update({
-      status: isPartial ? PaymentStatus.PARTIAL : PaymentStatus.PAID,
-      transactionId,
-      paidAt: new Date(),
-      receiptUrl: `https://studyflow-receipts.s3.amazonaws.com/receipt_${payment.id}.pdf`,
+    await verifyCapturedPayment(
+      payment.orderId,
+      providerId,
+      body.razorpay_signature,
+      Number(payment.amount),
+    );
+    return sequelize.transaction(async (transaction) => {
+      const locked = await Payment.findByPk(paymentId, {
+        transaction,
+        lock: transaction.LOCK.UPDATE,
+      });
+      if (!locked || locked.orderId !== payment.orderId)
+        throw new BadRequestException('Payment changed; retry verification');
+      if (locked.status === PaymentStatus.REFUNDED)
+        throw new BadRequestException('Payment has been refunded');
+      if (locked.paidAt) {
+        if (locked.transactionId !== providerId)
+          throw new BadRequestException(
+            'Payment already settled with another transaction',
+          );
+        return locked;
+      }
+      await this.settle(locked, providerId, transaction);
+      return locked;
     });
-
-    if (payment.subscriptionPlanId) {
-      await this.activateSubscription(payment.studentProfileId, payment.subscriptionPlanId);
-    }
-
-    return payment;
   }
 
   async recordManualPayment(paymentId: string, method: PaymentMethod) {
-    const payment = await Payment.findByPk(paymentId);
-    if (!payment) throw new NotFoundException('Payment record not found');
-
-    let isPartial = false;
-    if (payment.subscriptionPlanId) {
-      const plan = await SubscriptionPlan.findByPk(payment.subscriptionPlanId);
-      if (plan && Number(payment.amount) < Number(plan.price)) {
-        isPartial = true;
-      }
-    }
-
-    await payment.update({
-      status: isPartial ? PaymentStatus.PARTIAL : PaymentStatus.PAID,
-      method,
-      transactionId: `${method}-${Date.now()}`,
-      paidAt: new Date(),
-      receiptUrl: `https://studyflow-receipts.s3.amazonaws.com/receipt_${payment.id}.pdf`,
+    if (![PaymentMethod.CASH, PaymentMethod.UPI].includes(method))
+      throw new BadRequestException(
+        'Only cash or UPI can be recorded manually',
+      );
+    return sequelize.transaction(async (transaction) => {
+      const payment = await Payment.findByPk(paymentId, {
+        transaction,
+        lock: transaction.LOCK.UPDATE,
+      });
+      if (!payment) throw new NotFoundException('Payment record not found');
+      if (payment.method === PaymentMethod.RAZORPAY)
+        throw new BadRequestException(
+          'Razorpay payments require provider verification',
+        );
+      if (payment.status === PaymentStatus.REFUNDED)
+        throw new BadRequestException('Payment has been refunded');
+      if (payment.paidAt) return payment;
+      payment.method = method;
+      await this.settle(
+        payment,
+        `${method}-${crypto.randomUUID()}`,
+        transaction,
+      );
+      return payment;
     });
-
-    return payment;
   }
 
-  private async activateSubscription(studentProfileId: string, planId: string) {
-    const plan = await SubscriptionPlan.findByPk(planId);
-    if (!plan) return;
-
-    const student = await StudentProfile.findByPk(studentProfileId);
-    if (!student) return;
-
-    // Check if there is an active subscription
-    const activeSub = await StudentSubscription.findOne({
-      where: { studentProfileId, status: SubscriptionStatus.ACTIVE },
-      order: [['endDate', 'DESC']],
+  private async settle(
+    payment: Payment,
+    transactionId: string,
+    transaction: Transaction,
+  ) {
+    const student = await StudentProfile.findByPk(payment.studentProfileId, {
+      transaction,
+      lock: transaction.LOCK.UPDATE,
     });
-
-    let startDate = new Date();
-    if (activeSub && activeSub.endDate > startDate) {
-      startDate = activeSub.endDate; // Queue plan to start after current one ends
+    if (!student || student.workspaceId !== payment.workspaceId)
+      throw new BadRequestException('Invalid student payment relationship');
+    let plan: SubscriptionPlan | null = null;
+    if (payment.subscriptionPlanId) {
+      plan = await SubscriptionPlan.findOne({
+        where: {
+          id: payment.subscriptionPlanId,
+          workspaceId: payment.workspaceId,
+        },
+        transaction,
+      });
+      if (!plan) throw new BadRequestException('Subscription plan unavailable');
     }
-
-    const endDate = new Date(startDate.getTime() + plan.durationDays * 24 * 60 * 60 * 1000);
-
-    await StudentSubscription.create({
-      workspaceId: student.workspaceId,
-      studentProfileId,
-      subscriptionPlanId: planId,
-      startDate,
-      endDate,
-      status: SubscriptionStatus.ACTIVE,
-    } as any);
+    const total = Number(payment.totalAmount ?? plan?.price ?? payment.amount);
+    const due = Math.max(
+      0,
+      Math.round(
+        (total - Number(payment.discountAmount ?? 0) - Number(payment.amount)) *
+          100,
+      ) / 100,
+    );
+    // Legacy pending records already adjusted the profile balance at creation.
+    if (payment.totalAmount != null && due > 0) {
+      await student.update(
+        { dueAmount: Number(student.dueAmount || 0) + due },
+        { transaction },
+      );
+    }
+    let subscriptionId = payment.studentSubscriptionId;
+    if (plan && !subscriptionId) {
+      const active = await StudentSubscription.findOne({
+        where: {
+          studentProfileId: student.id,
+          status: SubscriptionStatus.ACTIVE,
+        },
+        order: [['endDate', 'DESC']],
+        transaction,
+      });
+      const now = new Date();
+      const startDate = active && active.endDate > now ? active.endDate : now;
+      const sub = await StudentSubscription.create(
+        {
+          workspaceId: student.workspaceId,
+          studentProfileId: student.id,
+          subscriptionPlanId: plan.id,
+          startDate,
+          endDate: new Date(startDate.getTime() + plan.durationDays * 86400000),
+          status: SubscriptionStatus.ACTIVE,
+        } as any,
+        { transaction },
+      );
+      subscriptionId = sub.id;
+    }
+    await payment.update(
+      {
+        status: due > 0 ? PaymentStatus.PARTIAL : PaymentStatus.PAID,
+        transactionId,
+        paidAt: new Date(),
+        studentSubscriptionId: subscriptionId,
+        method: payment.method,
+      },
+      { transaction },
+    );
   }
 
   async getPayments(workspaceId: string, query: any) {
-    const { studentProfileId } = query;
-    const whereClause: any = {};
-
-    if (studentProfileId) {
-      whereClause.studentProfileId = studentProfileId;
-    }
-
     return Payment.findAll({
-      where: whereClause,
-      attributes: [
-        'id',
-        'studentProfileId',
-        'amount',
-        'status',
-        'method',
-        'transactionId',
-        'invoiceUrl',
-        'receiptUrl',
-        'dueDate',
-        'paidAt',
-        'createdAt'
-      ],
+      where: {
+        workspaceId,
+        ...(query.branchId ? { branchId: query.branchId } : {}),
+        ...(query.studentProfileId
+          ? { studentProfileId: query.studentProfileId }
+          : {}),
+      },
       include: [
         {
           model: StudentProfile,
-          required: true,
+          required: false,
           attributes: ['id'],
-          include: [
-            {
-              model: User,
-              where: { workspaceId },
-              attributes: ['id', 'name', 'email']
-            }
-          ],
+          include: [{ model: User, attributes: ['id', 'name', 'email'] }],
         },
       ],
       order: [['createdAt', 'DESC']],
     });
   }
 
-  async getCollectionReport(workspaceId: string, range: string) {
+  async getCollectionReport(
+    workspaceId: string,
+    range: string,
+    branchId?: string,
+  ) {
     const today = new Date();
-    let startDate = new Date(today.getFullYear(), today.getMonth(), 1); // Start of month
-
-    if (range === 'daily') {
-      startDate = new Date(today.setHours(0, 0, 0, 0));
-    }
-
+    const startDate =
+      range === 'daily'
+        ? new Date(new Date().setHours(0, 0, 0, 0))
+        : new Date(today.getFullYear(), today.getMonth(), 1);
     const payments = await Payment.findAll({
       where: {
-        status: PaymentStatus.PAID,
+        workspaceId,
+        ...(branchId ? { branchId } : {}),
+        status: { [Op.in]: [PaymentStatus.PAID, PaymentStatus.PARTIAL] },
         paidAt: { [Op.gte]: startDate },
       },
-      attributes: [
-        'id',
-        'amount',
-        'status',
-        'method',
-        'transactionId',
-        'invoiceUrl',
-        'receiptUrl',
-        'dueDate',
-        'paidAt',
-        'createdAt'
-      ],
       include: [
         {
           model: StudentProfile,
-          required: true,
+          required: false,
           attributes: ['id'],
-          include: [
-            {
-              model: User,
-              where: { workspaceId },
-              attributes: ['id', 'name', 'email']
-            }
-          ],
+          include: [{ model: User, attributes: ['id', 'name', 'email'] }],
         },
       ],
     });
-
-    const totalCollected = payments.reduce((sum, p) => sum + parseFloat(String(p.amount)), 0);
-
     return {
       range,
-      totalCollected,
+      totalCollected: payments.reduce((sum, p) => sum + Number(p.amount), 0),
       count: payments.length,
       payments,
     };

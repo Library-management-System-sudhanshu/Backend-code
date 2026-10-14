@@ -1,4 +1,14 @@
-import { Table, Column, Model, DataType, ForeignKey, BelongsTo, HasOne, HasMany, Index } from 'sequelize-typescript';
+import {
+  Table,
+  Column,
+  Model,
+  DataType,
+  ForeignKey,
+  BelongsTo,
+  HasOne,
+  HasMany,
+  Index,
+} from 'sequelize-typescript';
 import { Workspace } from './workspace.model';
 import { Branch } from './branch.model';
 import { StudentProfile } from './student-profile.model';
@@ -13,6 +23,13 @@ export enum UserRole {
 
 @Table({ tableName: 'users', paranoid: true })
 export class User extends Model<User> {
+  toJSON(): any {
+    const values: any = { ...this.get({ plain: true }) };
+    delete values.password;
+    delete values.googleId;
+    return values;
+  }
+
   @Column({
     type: DataType.UUID,
     defaultValue: DataType.UUIDV4,
@@ -61,6 +78,6 @@ export class User extends Model<User> {
   @BelongsTo(() => Branch, { onDelete: 'SET NULL' })
   branch: Branch;
 
-  @HasOne(() => StudentProfile)
-  studentProfile: StudentProfile;
+  @HasMany(() => StudentProfile)
+  studentProfiles: StudentProfile[];
 }

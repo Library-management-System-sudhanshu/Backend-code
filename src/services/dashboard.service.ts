@@ -1,3 +1,4 @@
+import { WorkspaceMembership } from '../models/workspace-membership.model';
 import { StudentProfile } from '../models/student-profile.model';
 import { Seat } from '../models/seat.model';
 import { Payment } from '../models/payment.model';
@@ -12,11 +13,15 @@ import { SaaSPlan } from '../models/saas-plan.model';
 import { Op } from 'sequelize';
 
 export class DashboardService {
-  async getMetrics(workspaceId: string) {
+  async getMetrics(workspaceId: string, branchId?: string) {
     // Active students
     const activeStudents = await StudentProfile.count({
-      include: [{ model: User, where: { workspaceId, role: 'STUDENT' } }],
-      where: { status: 'APPROVED' },
+      include: [{ model: User }],
+      where: {
+        status: 'APPROVED',
+        workspaceId,
+        ...(branchId ? { branchId } : {}),
+      },
     });
 
     // Seat metrics
@@ -25,7 +30,19 @@ export class DashboardService {
         {
           model: Room,
           required: true,
-          include: [{ model: Floor, required: true, include: [{ model: Branch, required: true, where: { workspaceId } }] }],
+          include: [
+            {
+              model: Floor,
+              required: true,
+              include: [
+                {
+                  model: Branch,
+                  required: true,
+                  where: { workspaceId, ...(branchId ? { id: branchId } : {}) },
+                },
+              ],
+            },
+          ],
         },
       ],
     });
@@ -35,7 +52,19 @@ export class DashboardService {
         {
           model: Room,
           required: true,
-          include: [{ model: Floor, required: true, include: [{ model: Branch, required: true, where: { workspaceId } }] }],
+          include: [
+            {
+              model: Floor,
+              required: true,
+              include: [
+                {
+                  model: Branch,
+                  required: true,
+                  where: { workspaceId, ...(branchId ? { id: branchId } : {}) },
+                },
+              ],
+            },
+          ],
         },
       ],
       where: { status: 'OCCUPIED' },
@@ -43,18 +72,12 @@ export class DashboardService {
 
     const vacantSeats = totalSeats - occupiedSeats;
 
-    // Financials
-    const unpaidPayments = await Payment.findAll({
-      include: [
-        {
-          model: StudentProfile,
-          required: true,
-          include: [{ model: User, where: { workspaceId } }],
-        },
-      ],
-      where: { status: 'UNPAID' },
-    });
-    const duePayments = unpaidPayments.reduce((sum, p) => sum + Number(p.amount), 0);
+    // Use the same outstanding balance shown on each enrollment.
+    const duePayments = Number(
+      (await StudentProfile.sum('dueAmount', {
+        where: { workspaceId, ...(branchId ? { branchId } : {}) },
+      })) || 0,
+    );
 
     const today = new Date();
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -62,16 +85,22 @@ export class DashboardService {
       include: [
         {
           model: StudentProfile,
-          required: true,
-          include: [{ model: User, where: { workspaceId } }],
+          where: { workspaceId, ...(branchId ? { branchId } : {}) },
+          required: false,
+          include: [{ model: User, required: false }],
         },
       ],
       where: {
-        status: 'PAID',
+        status: { [Op.in]: ['PAID', 'PARTIAL'] },
+        workspaceId,
+        ...(branchId ? { branchId } : {}),
         paidAt: { [Op.gte]: startOfMonth },
       },
     });
-    const monthlyRevenue = paidPaymentsThisMonth.reduce((sum, p) => sum + Number(p.amount), 0);
+    const monthlyRevenue = paidPaymentsThisMonth.reduce(
+      (sum, p) => sum + Number(p.amount),
+      0,
+    );
 
     // Expiring subscriptions (next 7 days)
     const sevenDaysFromNow = new Date();
@@ -80,8 +109,9 @@ export class DashboardService {
       include: [
         {
           model: StudentProfile,
+          where: { workspaceId, ...(branchId ? { branchId } : {}) },
           required: true,
-          include: [{ model: User, where: { workspaceId } }],
+          include: [{ model: User }],
         },
       ],
       where: {
@@ -102,7 +132,8 @@ export class DashboardService {
       { month: 'Jun', amount: monthlyRevenue },
     ];
 
-    const occupancyRate = totalSeats > 0 ? Math.round((occupiedSeats / totalSeats) * 100) : 0;
+    const occupancyRate =
+      totalSeats > 0 ? Math.round((occupiedSeats / totalSeats) * 100) : 0;
     const occupancyTrend = [
       { name: 'Occupied', value: occupiedSeats },
       { name: 'Vacant', value: vacantSeats },
@@ -142,9 +173,10 @@ export class DashboardService {
       limit: 5,
       include: [
         {
-          model: User,
-          where: { role: 'OWNER' },
+          model: WorkspaceMembership,
+          where: { role: 'OWNER', status: 'ACTIVE' },
           required: false,
+          include: [{ model: User, attributes: ['id', 'name'] }],
         },
       ],
     });
@@ -157,18 +189,19 @@ export class DashboardService {
           order: [['createdAt', 'DESC']],
         });
 
-        const owner = ws.users && ws.users[0] ? ws.users[0].name : 'Unknown';
+        const owner = ws.memberships?.[0]?.user?.name || 'Unknown';
 
         return {
           id: ws.id,
           name: ws.name,
           subdomain: ws.subdomain,
           owner: owner,
-          plan: sub && sub.saasPlan ? sub.saasPlan.name : (sub ? sub.status : 'None'),
+          plan:
+            sub && sub.saasPlan ? sub.saasPlan.name : sub ? sub.status : 'None',
           status: sub ? sub.status : 'NO_SUBSCRIPTION',
           createdAt: ws.createdAt,
         };
-      })
+      }),
     );
 
     return {

@@ -1,14 +1,23 @@
-import { Complaint, ComplaintCategory, ComplaintStatus } from '../models/complaint.model';
+import {
+  Complaint,
+  ComplaintCategory,
+  ComplaintStatus,
+} from '../models/complaint.model';
 import { StudentProfile } from '../models/student-profile.model';
 import { User } from '../models/user.model';
 import { NotFoundException } from '../middlewares/error.middleware';
 
 export class ComplaintService {
-  async createComplaint(studentProfileId: string, data: { category: ComplaintCategory; description: string }) {
+  async createComplaint(
+    studentProfileId: string,
+    data: { category: ComplaintCategory; description: string },
+  ) {
     const student = await StudentProfile.findByPk(studentProfileId);
     if (!student) throw new NotFoundException('Student profile not found');
 
     return Complaint.create({
+      workspaceId: student.workspaceId,
+      branchId: student.branchId,
       studentProfileId,
       category: data.category,
       description: data.description,
@@ -16,13 +25,14 @@ export class ComplaintService {
     } as any);
   }
 
-  async getWorkspaceComplaints(workspaceId: string) {
+  async getWorkspaceComplaints(workspaceId: string, branchId?: string) {
     return Complaint.findAll({
+      where: { workspaceId, ...(branchId ? { branchId } : {}) },
       include: [
         {
           model: StudentProfile,
           required: true,
-          include: [{ model: User, where: { workspaceId } }],
+          include: [{ model: User }],
         },
       ],
       order: [['createdAt', 'DESC']],
@@ -33,13 +43,17 @@ export class ComplaintService {
     return Complaint.findAll({
       where: { studentProfileId },
       include: [
-        { model: User, as: 'resolvedBy', attributes: ['id', 'name', 'email'] }
+        { model: User, as: 'resolvedBy', attributes: ['id', 'name', 'email'] },
       ],
       order: [['createdAt', 'DESC']],
     });
   }
 
-  async updateComplaintStatus(id: string, resolvedById: string, status: ComplaintStatus) {
+  async updateComplaintStatus(
+    id: string,
+    resolvedById: string,
+    status: ComplaintStatus,
+  ) {
     const complaint = await Complaint.findByPk(id);
     if (!complaint) throw new NotFoundException('Complaint not found');
 

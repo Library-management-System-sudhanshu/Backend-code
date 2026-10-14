@@ -1,4 +1,12 @@
-import { Table, Column, Model, DataType, HasMany, HasOne } from 'sequelize-typescript';
+import {
+  Table,
+  Column,
+  Model,
+  DataType,
+  HasMany,
+  HasOne,
+} from 'sequelize-typescript';
+import { WorkspaceMembership } from './workspace-membership.model';
 import { User } from './user.model';
 import { Branch } from './branch.model';
 import { Shift } from './shift.model';
@@ -34,6 +42,9 @@ export class Workspace extends Model<Workspace> {
 
   @Column({ type: DataType.BOOLEAN, defaultValue: true })
   isActive: boolean;
+
+  @HasMany(() => WorkspaceMembership)
+  memberships: WorkspaceMembership[];
 
   @HasMany(() => User)
   users: User[];
